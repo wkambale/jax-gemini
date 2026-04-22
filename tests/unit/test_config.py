@@ -7,7 +7,7 @@ class TestConfig:
 
     def test_default_config(self):
         config = JaxGeminiConfig()
-        assert config.model_name in ["gemini-1.5-pro", "gemini-2.5-pro"]
+        assert config.model_name == "gemini-3.1-pro"
         assert config.temperature == 0.2
 
     def test_set_updates_values(self):

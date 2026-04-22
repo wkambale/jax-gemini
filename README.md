@@ -39,7 +39,7 @@ pip install jax-gemini
 ```python
 jg.config.set({
     "gemini_api_key": "...",
-    "model_name": "gemini-1.5-pro",
+    "model_name": "gemini-3.1-pro",
     "temperature": 0.2,
     "max_retries": 3,
 })

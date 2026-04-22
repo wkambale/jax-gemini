@@ -12,6 +12,7 @@ from jax_gemini.codegen.parser import CodeParser
 from jax_gemini.codegen.validator import CodeValidator
 from jax_gemini.codegen.fixer import CodeFixer
 from jax_gemini.sandbox.executor import SandboxExecutor
+import flax.nnx as nnx
 from jax_gemini.memory.conversation import ConversationMemory
 from jax_gemini.pipeline import builder, trainer, evaluator, exporter
 
@@ -107,13 +108,13 @@ class JaxGemini:
 
     def build(self, prompt: str) -> Any:
         """Build a JAX/Flax model from a natural language description."""
-        model = self._generate_and_execute(prompt, intent="build")
+        model = self._generate_and_execute(prompt, intent="build", runtime_args={"rngs": nnx.Rngs(0)})
         self._current_model = model
         return model
 
     def modify(self, prompt: str) -> Any:
         """Refine the current model based on a natural language instruction."""
-        model = self._generate_and_execute(prompt, intent="build")
+        model = self._generate_and_execute(prompt, intent="build", runtime_args={"rngs": nnx.Rngs(0)})
         self._current_model = model
         return model
 

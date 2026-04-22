@@ -2,6 +2,8 @@ import pytest
 from jax_gemini.sandbox.executor import SandboxExecutor
 from jax_gemini.exceptions import JaxGeminiExecutionError
 
+import flax.nnx as nnx
+
 class TestSandboxExecutor:
 
     def setup_method(self):
@@ -13,7 +15,7 @@ class TestSandboxExecutor:
             "def build_model(rngs):\n"
             "    return nnx.Linear(784, 10, rngs=rngs)\n"
         )
-        result = self.executor.run(code, "build", {"rngs": None})
+        result = self.executor.run(code, "build", {"rngs": nnx.Rngs(0)})
         assert result is not None
 
     def test_runtime_error_raises_execution_error(self):
