@@ -5,7 +5,7 @@ from typing import Optional
 @dataclass
 class JaxGeminiConfig:
     gemini_api_key: Optional[str] = None
-    model_name: str = "gemini-2.5-pro"
+    model_name: str = "gemini-3.1-pro"
     temperature: float = 0.2          # Low temp for deterministic code
     max_output_tokens: int = 4096
     max_retries: int = 3

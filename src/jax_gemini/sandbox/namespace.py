@@ -11,16 +11,19 @@ try:
 except ImportError:
     _orbax_available = False
 
+import builtins
+
 SAFE_BUILTINS = {
-    name: getattr(__builtins__, name, None)
+    name: getattr(builtins, name, None)
     for name in [
         "print", "range", "len", "enumerate", "zip", "map", "filter",
         "sorted", "reversed", "min", "max", "sum", "abs", "round",
         "int", "float", "str", "bool", "list", "dict", "tuple", "set",
         "isinstance", "hasattr", "getattr", "type", "repr",
         "True", "False", "None", "__import__",
+        "Exception", "ValueError", "TypeError", "RuntimeError", "KeyError"
     ]
-    if getattr(__builtins__, name, None) is not None
+    if getattr(builtins, name, None) is not None
 }
 
 BASE_NAMESPACE: dict = {
