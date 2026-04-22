@@ -13,7 +13,7 @@
 
 Unlike traditional descriptive LLM wrappers, **jax-gemini returns real, executable Python/JAX `flax.nnx.Module` objects**. Your prompts dictate instructions; Gemini generates the respective code; jax-gemini runs it securely inside a sandboxed namespace and hands the resulting object back to you.
 
-## ✨ Features
+## Features
 
 - **Real Objects, Not Text**: Every operation yields a genuine Python object (e.g. `flax.nnx.Module`), trained weights, or dictionaries natively integrated with JAX environments.
 - **Conversational Memory**: Retains the context of modifications multi-turn iteratively. Add dropout layers, reshape variables or tweak hyper-parameters step-by-step.
