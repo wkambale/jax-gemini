@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name            = "jax-gemini"
-version         = "0.1.0"
+version         = "0.1.1"
 description     = "Natural language-driven JAX/Flax model building powered by Gemini"
 readme          = "README.md"
 license         = { file = "LICENSE" }
