@@ -1,7 +1,7 @@
 from jax_gemini.prompts.intent import IntentClassifier
 
-class TestIntentClassifier:
 
+class TestIntentClassifier:
     def test_classify_build(self):
         assert IntentClassifier.classify("build a model") == "build"
         assert IntentClassifier.classify("create an mlp") == "build"

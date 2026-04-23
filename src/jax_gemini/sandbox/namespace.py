@@ -1,12 +1,13 @@
-import jax
-import jax.numpy as jnp
 import flax
 import flax.nnx as nnx
-import optax
+import jax
+import jax.numpy as jnp
 import numpy as np
+import optax
 
 try:
     import orbax.checkpoint as ocp
+
     _orbax_available = True
 except ImportError:
     _orbax_available = False
@@ -16,12 +17,42 @@ import builtins
 SAFE_BUILTINS = {
     name: getattr(builtins, name, None)
     for name in [
-        "print", "range", "len", "enumerate", "zip", "map", "filter",
-        "sorted", "reversed", "min", "max", "sum", "abs", "round",
-        "int", "float", "str", "bool", "list", "dict", "tuple", "set",
-        "isinstance", "hasattr", "getattr", "type", "repr",
-        "True", "False", "None", "__import__",
-        "Exception", "ValueError", "TypeError", "RuntimeError", "KeyError"
+        "print",
+        "range",
+        "len",
+        "enumerate",
+        "zip",
+        "map",
+        "filter",
+        "sorted",
+        "reversed",
+        "min",
+        "max",
+        "sum",
+        "abs",
+        "round",
+        "int",
+        "float",
+        "str",
+        "bool",
+        "list",
+        "dict",
+        "tuple",
+        "set",
+        "isinstance",
+        "hasattr",
+        "getattr",
+        "type",
+        "repr",
+        "True",
+        "False",
+        "None",
+        "__import__",
+        "Exception",
+        "ValueError",
+        "TypeError",
+        "RuntimeError",
+        "KeyError",
     ]
     if getattr(builtins, name, None) is not None
 }
@@ -37,7 +68,8 @@ BASE_NAMESPACE: dict = {
 }
 
 if _orbax_available:
-    import orbax.checkpoint as ocp # type: ignore
+    import orbax.checkpoint as ocp  # type: ignore
+
     BASE_NAMESPACE["ocp"] = ocp
     BASE_NAMESPACE["orbax"] = __import__("orbax")
 

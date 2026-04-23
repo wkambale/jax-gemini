@@ -1,5 +1,7 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import pytest
+
 import jax_gemini as jg
 
 MOCK_BUILD_RESPONSE = {
@@ -18,11 +20,12 @@ MOCK_BUILD_RESPONSE = {
     "warnings": [],
 }
 
-class TestBuildPipeline:
 
+class TestBuildPipeline:
     @patch("jax_gemini.llm.gemini.genai")
     def test_build_returns_flax_module(self, mock_genai, config):
         import json
+
         mock_response = MagicMock()
         mock_response.text = json.dumps(MOCK_BUILD_RESPONSE)
         mock_genai.GenerativeModel.return_value.generate_content.return_value = mock_response
@@ -30,7 +33,7 @@ class TestBuildPipeline:
         agent = jg.JaxGemini(config=config)
         model = agent.build("Build a model")
         assert model is not None
-        assert hasattr(model, "__call__")
+        assert callable(model)
 
     def test_build_without_api_key_raises_config_error(self, monkeypatch):
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)

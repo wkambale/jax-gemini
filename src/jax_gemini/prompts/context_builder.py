@@ -1,8 +1,8 @@
 from jax_gemini.memory.conversation import ConversationMemory, ModelState
 from jax_gemini.prompts import system_prompt
 
-class ContextBuilder:
 
+class ContextBuilder:
     @staticmethod
     def build(
         intent: str,
@@ -26,7 +26,7 @@ class ContextBuilder:
             sys_prompt = system_prompt.BUILD_SYSTEM_PROMPT
 
         messages = []
-        
+
         # System prompt as first user turn, followed by an ack from the model, per guidelines
         messages.append({"role": "user", "parts": [sys_prompt]})
         messages.append({"role": "model", "parts": ["Understood. I will generate JAX/Flax code."]})
@@ -36,10 +36,10 @@ class ContextBuilder:
 
         # If there's a current model state and we are modifying/training/etc., we might remind it
         # but let's stick to the prompt engineering guidelines
-        
+
         # Finally, append current user prompt
         messages.append({"role": "user", "parts": [user_prompt]})
-        
+
         return messages
 
     @staticmethod
@@ -54,7 +54,7 @@ class ContextBuilder:
                 "description": {"type": "string"},
                 "warnings": {"type": "array", "items": {"type": "string"}},
                 "parameters": {"type": "object"},
-                "hyperparameters": {"type": "object"}
+                "hyperparameters": {"type": "object"},
             },
-            "required": ["intent", "code", "description"]
+            "required": ["intent", "code", "description"],
         }

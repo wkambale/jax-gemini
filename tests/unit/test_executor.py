@@ -1,11 +1,11 @@
-import pytest
-from jax_gemini.sandbox.executor import SandboxExecutor
-from jax_gemini.exceptions import JaxGeminiExecutionError
-
 import flax.nnx as nnx
+import pytest
+
+from jax_gemini.exceptions import JaxGeminiExecutionError
+from jax_gemini.sandbox.executor import SandboxExecutor
+
 
 class TestSandboxExecutor:
-
     def setup_method(self):
         self.executor = SandboxExecutor()
 

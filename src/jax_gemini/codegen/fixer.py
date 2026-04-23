@@ -1,7 +1,4 @@
-from jax_gemini.exceptions import JaxGeminiExecutionError, JaxGeminiValidationError
-
 class CodeFixer:
-
     @staticmethod
     def build_fix_prompt(
         original_prompt: str,

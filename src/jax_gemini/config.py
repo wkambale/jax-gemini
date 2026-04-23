@@ -1,12 +1,11 @@
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 
 @dataclass
 class JaxGeminiConfig:
-    gemini_api_key: Optional[str] = None
+    gemini_api_key: str | None = None
     model_name: str = "gemini-3.1-pro"
-    temperature: float = 0.2          # Low temp for deterministic code
+    temperature: float = 0.2  # Low temp for deterministic code
     max_output_tokens: int = 4096
     max_retries: int = 3
     verbose: bool = False
@@ -16,6 +15,7 @@ class JaxGeminiConfig:
     def set(self, updates: dict) -> None:
         """Update config from a dict. Used as jg.config.set({...})."""
         from jax_gemini.exceptions import JaxGeminiConfigError
+
         for key, value in updates.items():
             if not hasattr(self, key):
                 raise JaxGeminiConfigError(f"Unknown config key: '{key}'")
@@ -23,8 +23,10 @@ class JaxGeminiConfig:
 
     def validate(self) -> None:
         """Raise JaxGeminiConfigError if config is invalid."""
-        from jax_gemini.exceptions import JaxGeminiConfigError
         import os
+
+        from jax_gemini.exceptions import JaxGeminiConfigError
+
         if not self.gemini_api_key:
             self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
         if not self.gemini_api_key:

@@ -173,14 +173,14 @@ Respond ONLY with JSON matching:
 
 LOAD_SYSTEM_PROMPT = """
 You are an expert Orbax checkpointing engineer. Generate a complete load code.
-Assume `model` architecture must be reconstructed first or provided. For now, 
+Assume `model` architecture must be reconstructed first or provided. For now,
 wait, actually we might need to rely on the conversation history to know the architecture?
 Let's assume the user will pass the architecture if needed, or we just load params.
 
 RULES:
 - The function MUST be named `load_model`.
 - Signature: `load_model(path: str) -> Any`
-- Given the path, load and construct the model. Wait, NNX allows returning state or constructing if class is known. 
+- Given the path, load and construct the model. Wait, NNX allows returning state or constructing if class is known.
 For simplicity, since users do not write code, we might just unpickle? No, orbax.
 We will let Gemini try to figure out load.
 

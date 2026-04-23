@@ -1,9 +1,7 @@
-import json
 from jax_gemini.exceptions import JaxGeminiLLMError
 
 
 class CodeParser:
-
     @staticmethod
     def extract(response: dict, intent: str) -> str:
         """
@@ -21,9 +19,8 @@ class CodeParser:
         """
         if "code" not in response:
             raise JaxGeminiLLMError(
-                "Gemini response missing 'code' field. "
-                f"Got fields: {list(response.keys())}",
-                raw_response=str(response)
+                f"Gemini response missing 'code' field. Got fields: {list(response.keys())}",
+                raw_response=str(response),
             )
         code = response["code"].strip()
         if not code:

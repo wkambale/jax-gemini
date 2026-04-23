@@ -1,5 +1,5 @@
-from unittest.mock import patch, MagicMock
-import pytest
+from unittest.mock import MagicMock, patch
+
 import jax_gemini as jg
 
 MOCK_MODIFY_RESPONSE = {
@@ -18,19 +18,20 @@ MOCK_MODIFY_RESPONSE = {
     "warnings": [],
 }
 
-class TestFullConversation:
 
+class TestFullConversation:
     @patch("jax_gemini.llm.gemini.genai")
     def test_full_conversation(self, mock_genai, config):
         import json
+
         mock_response = MagicMock()
         mock_response.text = json.dumps(MOCK_MODIFY_RESPONSE)
         mock_genai.GenerativeModel.return_value.generate_content.return_value = mock_response
 
         agent = jg.JaxGemini(config=config)
-        model = agent.build("Build a model")
-        model = agent.modify("Change hidden to 512")
-        
+        agent.build("Build a model")
+        agent.modify("Change hidden to 512")
+
         assert agent._memory.turn_count == 4
         agent.reset()
         assert agent._memory.turn_count == 0
