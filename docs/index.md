@@ -2,7 +2,7 @@
 
 Welcome to the `jax-gemini` documentation!
 
-[![PyPI version](https://img.shields.io/pypi/v/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.0/)
+[![PyPI version](https://img.shields.io/pypi/v/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.1/)
 
 `jax-gemini` allows executing and dynamically instantiating robust deep-learning pipelines using JAX and Flax strictly out of conversational natural language instructions. Powered by Gemini, the package orchestrates automatic AST compilation handling code execution inside isolated runtime namespaces.
 
