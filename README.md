@@ -24,7 +24,7 @@ Unlike traditional descriptive LLM wrappers, **jax-gemini returns real, executab
 
 ### Installation
 
-Install via PyPI:
+Install via [PyPI](https://pypi.org/project/jax-gemini/):
 ```bash
 pip install jax-gemini
 ```
