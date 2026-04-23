@@ -2,8 +2,8 @@
   <h1>Jax-Gemini</h1>
   <p><b>Natural language-driven JAX/Flax model building powered by Google Gemini.</b></p>
   
-  [![PyPI version](https://img.shields.io/pypi/v/jax-gemini.svg)](https://pypi.org/project/jax-gemini/)
-  [![Python Versions](https://img.shields.io/pypi/pyversions/jax-gemini.svg)](https://pypi.org/project/jax-gemini/)
+  [![PyPI version](https://img.shields.io/pypi/v/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.0/)
+  [![Python Versions](https://img.shields.io/pypi/pyversions/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.0/)
   [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 </div>
 
@@ -24,7 +24,7 @@ Unlike traditional descriptive LLM wrappers, **jax-gemini returns real, executab
 
 ### Installation
 
-Install via [PyPI](https://pypi.org/project/jax-gemini/):
+Install via [PyPI](https://pypi.org/project/jax-gemini/0.1.0/):
 ```bash
 pip install jax-gemini
 ```
