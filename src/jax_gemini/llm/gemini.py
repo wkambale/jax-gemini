@@ -1,13 +1,14 @@
 import json
 import os
+
 import google.generativeai as genai
-from jax_gemini.llm.base import AbstractLLM
-from jax_gemini.exceptions import JaxGeminiLLMError, JaxGeminiConfigError
+
 from jax_gemini.config import JaxGeminiConfig
+from jax_gemini.exceptions import JaxGeminiConfigError, JaxGeminiLLMError
+from jax_gemini.llm.base import AbstractLLM
 
 
 class GeminiLLM(AbstractLLM):
-
     def __init__(self, config: JaxGeminiConfig):
         api_key = config.gemini_api_key or os.environ.get("GEMINI_API_KEY")
         if not api_key:
@@ -35,7 +36,7 @@ class GeminiLLM(AbstractLLM):
         except json.JSONDecodeError as e:
             raise JaxGeminiLLMError(
                 f"Gemini returned invalid JSON: {e}",
-                raw_response=response.text if (response and hasattr(response, 'text')) else ""
+                raw_response=response.text if (response and hasattr(response, "text")) else "",
             )
         except Exception as e:
             raise JaxGeminiLLMError(f"Gemini API error: {e}")

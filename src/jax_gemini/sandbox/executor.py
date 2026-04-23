@@ -1,28 +1,27 @@
 import traceback
 from typing import Any
-from jax_gemini.sandbox.namespace import get_execution_namespace
-from jax_gemini.exceptions import JaxGeminiExecutionError
 
+from jax_gemini.exceptions import JaxGeminiExecutionError
+from jax_gemini.sandbox.namespace import get_execution_namespace
 
 INTENT_FUNCTION_MAP: dict[str, str] = {
-    "build":    "build_model",
-    "train":    "train_model",
+    "build": "build_model",
+    "train": "train_model",
     "evaluate": "evaluate_model",
-    "save":     "save_model",
-    "load":     "load_model",
+    "save": "save_model",
+    "load": "load_model",
 }
 
 INTENT_DEFAULT_ARGS: dict[str, dict] = {
-    "build":    {},
-    "train":    {"dataset": None, "epochs": 5, "learning_rate": 1e-3},
+    "build": {},
+    "train": {"dataset": None, "epochs": 5, "learning_rate": 1e-3},
     "evaluate": {"dataset": None},
-    "save":     {"path": "./checkpoint"},
-    "load":     {"path": "./checkpoint"},
+    "save": {"path": "./checkpoint"},
+    "load": {"path": "./checkpoint"},
 }
 
 
 class SandboxExecutor:
-
     def run(
         self,
         code: str,
@@ -50,7 +49,7 @@ class SandboxExecutor:
         call_args = {**INTENT_DEFAULT_ARGS.get(intent, {}), **(args or {})}
 
         try:
-            exec(code, namespace)  # noqa: S102 — code is pre-validated by CodeValidator
+            exec(code, namespace)
         except Exception as e:
             tb = traceback.format_exc()
             raise JaxGeminiExecutionError(

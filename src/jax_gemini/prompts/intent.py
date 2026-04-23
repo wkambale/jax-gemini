@@ -1,7 +1,4 @@
-from jax_gemini.exceptions import JaxGeminiIntentError
-
 class IntentClassifier:
-    
     @staticmethod
     def classify(prompt: str) -> str:
         # A simple keyword-based intent classifier for now
@@ -17,4 +14,4 @@ class IntentClassifier:
         elif "build" in p or "create" in p or "make" in p or "add" in p or "change" in p:
             return "build"
         else:
-            return "build" # Default to build
+            return "build"  # Default to build

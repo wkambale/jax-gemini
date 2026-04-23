@@ -1,24 +1,20 @@
-from typing import Any
 import os
-import jax.numpy as jnp
-import numpy as np
+from typing import Any
 
+import flax.nnx as nnx
+
+from jax_gemini.codegen.fixer import CodeFixer
+from jax_gemini.codegen.parser import CodeParser
+from jax_gemini.codegen.validator import CodeValidator
 from jax_gemini.config import JaxGeminiConfig
 from jax_gemini.exceptions import JaxGeminiExecutionError, JaxGeminiValidationError
 from jax_gemini.llm.gemini import GeminiLLM
-from jax_gemini.prompts.context_builder import ContextBuilder
-from jax_gemini.prompts.intent import IntentClassifier
-from jax_gemini.codegen.parser import CodeParser
-from jax_gemini.codegen.validator import CodeValidator
-from jax_gemini.codegen.fixer import CodeFixer
-from jax_gemini.sandbox.executor import SandboxExecutor
-import flax.nnx as nnx
 from jax_gemini.memory.conversation import ConversationMemory
-from jax_gemini.pipeline import builder, trainer, evaluator, exporter
+from jax_gemini.prompts.context_builder import ContextBuilder
+from jax_gemini.sandbox.executor import SandboxExecutor
 
 
 class JaxGemini:
-
     def __init__(self, config: JaxGeminiConfig | None = None):
         self.config = config or JaxGeminiConfig()
         self._llm: GeminiLLM | None = None
@@ -108,13 +104,17 @@ class JaxGemini:
 
     def build(self, prompt: str) -> Any:
         """Build a JAX/Flax model from a natural language description."""
-        model = self._generate_and_execute(prompt, intent="build", runtime_args={"rngs": nnx.Rngs(0)})
+        model = self._generate_and_execute(
+            prompt, intent="build", runtime_args={"rngs": nnx.Rngs(0)}
+        )
         self._current_model = model
         return model
 
     def modify(self, prompt: str) -> Any:
         """Refine the current model based on a natural language instruction."""
-        model = self._generate_and_execute(prompt, intent="build", runtime_args={"rngs": nnx.Rngs(0)})
+        model = self._generate_and_execute(
+            prompt, intent="build", runtime_args={"rngs": nnx.Rngs(0)}
+        )
         self._current_model = model
         return model
 
@@ -122,7 +122,7 @@ class JaxGemini:
         """Train the current model. Returns (model, metrics_dict)."""
         args = {"dataset": dataset} if dataset else {}
         if self._current_model is not None:
-             args["model"] = self._current_model
+            args["model"] = self._current_model
         result = self._generate_and_execute(prompt, intent="train", runtime_args=args)
         if isinstance(result, tuple):
             self._current_model = result[0]
@@ -133,23 +133,23 @@ class JaxGemini:
         """Evaluate the current model. Returns a metrics dict."""
         args = {"dataset": dataset} if dataset else {}
         if self._current_model is not None:
-             args["model"] = self._current_model
+            args["model"] = self._current_model
         return self._generate_and_execute(prompt, intent="evaluate", runtime_args=args)
 
     def save(self, name: str) -> str:
         """Save the current model checkpoint. Returns the checkpoint path."""
         path = os.path.join(self.config.checkpoint_dir, name)
         return self._generate_and_execute(
-            f"Save the model to {path}", intent="save",
-            runtime_args={"model": self._current_model, "path": path}
+            f"Save the model to {path}",
+            intent="save",
+            runtime_args={"model": self._current_model, "path": path},
         )
 
     def load(self, name: str) -> Any:
         """Load a model checkpoint by name."""
         path = os.path.join(self.config.checkpoint_dir, name)
         model = self._generate_and_execute(
-            f"Load the model from {path}", intent="load",
-            runtime_args={"path": path}
+            f"Load the model from {path}", intent="load", runtime_args={"path": path}
         )
         self._current_model = model
         return model

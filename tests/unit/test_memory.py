@@ -1,7 +1,7 @@
 from jax_gemini.memory.conversation import ConversationMemory
 
-class TestConversationMemory:
 
+class TestConversationMemory:
     def test_add_and_retrieve_turns(self):
         memory = ConversationMemory()
         memory.add_turn("user", "Build a model")
@@ -21,7 +21,7 @@ class TestConversationMemory:
             memory.add_turn("user", f"message {i}")
             memory.add_turn("model", f"response {i}")
         # Should not exceed 2 * max_turns * 2 (with system context)
-        # So wait, 3 * 2 = 6 turns ? The code says self._max_turns * 2. 
+        # So wait, 3 * 2 = 6 turns ? The code says self._max_turns * 2.
         # Actually from conversation.py logic:
         # self._turns = self._turns[:2] + self._turns[-(self._max_turns * 2 - 2):]
         # max turns total = max_turns * 2

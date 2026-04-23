@@ -1,9 +1,10 @@
 import pytest
+
 from jax_gemini.codegen.parser import CodeParser
 from jax_gemini.exceptions import JaxGeminiLLMError
 
-class TestParser:
 
+class TestParser:
     def test_extract_code(self):
         response = {"code": "print('hello')", "intent": "build"}
         assert CodeParser.extract(response, "build") == "print('hello')"

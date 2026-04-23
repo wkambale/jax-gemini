@@ -1,10 +1,10 @@
 import pytest
-import os
+
 from jax_gemini.config import JaxGeminiConfig
 from jax_gemini.exceptions import JaxGeminiConfigError
 
-class TestConfig:
 
+class TestConfig:
     def test_default_config(self):
         config = JaxGeminiConfig()
         assert config.model_name == "gemini-3.1-pro"
@@ -28,4 +28,4 @@ class TestConfig:
 
     def test_validate_with_api_key(self):
         config = JaxGeminiConfig(gemini_api_key="key")
-        config.validate() # should not raise
+        config.validate()  # should not raise

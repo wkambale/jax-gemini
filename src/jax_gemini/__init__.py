@@ -10,13 +10,13 @@ Quick start:
 from jax_gemini.agent import JaxGemini
 from jax_gemini.config import JaxGeminiConfig
 from jax_gemini.exceptions import (
-    JaxGeminiError,
+    JaxGeminiCheckpointError,
     JaxGeminiConfigError,
-    JaxGeminiLLMError,
-    JaxGeminiValidationError,
+    JaxGeminiError,
     JaxGeminiExecutionError,
     JaxGeminiIntentError,
-    JaxGeminiCheckpointError,
+    JaxGeminiLLMError,
+    JaxGeminiValidationError,
 )
 
 __version__ = "0.1.0"
@@ -25,24 +25,24 @@ __license__ = "MIT"
 
 __all__ = [
     "JaxGemini",
+    "JaxGeminiCheckpointError",
     "JaxGeminiConfig",
-    "JaxGeminiError",
     "JaxGeminiConfigError",
-    "JaxGeminiLLMError",
-    "JaxGeminiValidationError",
+    "JaxGeminiError",
     "JaxGeminiExecutionError",
     "JaxGeminiIntentError",
-    "JaxGeminiCheckpointError",
-    "config",
+    "JaxGeminiLLMError",
+    "JaxGeminiValidationError",
     "build",
-    "modify",
-    "train",
+    "config",
     "evaluate",
-    "save",
-    "load",
     "explain",
-    "show_code",
+    "load",
+    "modify",
     "reset",
+    "save",
+    "show_code",
+    "train",
 ]
 
 # Module-level singleton for simple usage pattern (jg.build, jg.train, etc.)

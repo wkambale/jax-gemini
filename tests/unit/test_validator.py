@@ -1,4 +1,5 @@
 import pytest
+
 from jax_gemini.codegen.validator import CodeValidator
 from jax_gemini.exceptions import JaxGeminiValidationError
 
@@ -9,8 +10,8 @@ def build_model(rngs):
     return nnx.Linear(784, 10, rngs=rngs)
 """
 
-class TestCodeValidator:
 
+class TestCodeValidator:
     def test_valid_code_passes(self):
         CodeValidator.validate(VALID_BUILD_CODE, "build")  # Should not raise
 

@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-class AbstractLLM(ABC):
 
+class AbstractLLM(ABC):
     @abstractmethod
     def generate(self, messages: list[dict[str, Any]], schema: dict) -> dict:
         """
