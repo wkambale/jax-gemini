@@ -49,6 +49,9 @@ REQUIRED_FUNCTION_NAMES: dict[str, str] = {
     "evaluate": "evaluate_model",
     "save": "save_model",
     "load": "load_model",
+    "load_data": "load_data",
+    "preprocess_data": "preprocess_data",
+    "analyze_data": "analyze_data",
 }
 
 MAX_CODE_LINES = 200

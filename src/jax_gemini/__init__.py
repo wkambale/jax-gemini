@@ -19,7 +19,7 @@ from jax_gemini.exceptions import (
     JaxGeminiValidationError,
 )
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 __author__ = "Wesley Kambale"
 __license__ = "MIT"
 
@@ -33,12 +33,15 @@ __all__ = [
     "JaxGeminiIntentError",
     "JaxGeminiLLMError",
     "JaxGeminiValidationError",
+    "analyze_data",
     "build",
     "config",
     "evaluate",
     "explain",
     "load",
+    "load_data",
     "modify",
+    "preprocess_data",
     "reset",
     "save",
     "show_code",
@@ -57,3 +60,6 @@ load = _default_agent.load
 explain = _default_agent.explain
 show_code = _default_agent.show_code
 reset = _default_agent.reset
+load_data = _default_agent.load_data
+preprocess_data = _default_agent.preprocess_data
+analyze_data = _default_agent.analyze_data

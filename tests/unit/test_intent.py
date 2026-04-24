@@ -17,3 +17,11 @@ class TestIntentClassifier:
     def test_classify_save_and_load(self):
         assert IntentClassifier.classify("save it") == "save"
         assert IntentClassifier.classify("load checkpoint") == "load"
+
+    def test_classify_data_pipeline(self):
+        assert IntentClassifier.classify("load data from memory") == "load_data"
+        assert (
+            IntentClassifier.classify("preprocess the dataset by standardizing")
+            == "preprocess_data"
+        )
+        assert IntentClassifier.classify("analyze data to find mean") == "analyze_data"
