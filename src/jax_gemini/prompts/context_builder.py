@@ -28,6 +28,8 @@ class ContextBuilder:
             sys_prompt = system_prompt.PREPROCESS_DATA_SYSTEM_PROMPT
         elif intent == "analyze_data":
             sys_prompt = system_prompt.ANALYZE_DATA_SYSTEM_PROMPT
+        elif intent == "visualize_data":
+            sys_prompt = system_prompt.VISUALIZE_DATA_SYSTEM_PROMPT
         else:
             sys_prompt = system_prompt.BUILD_SYSTEM_PROMPT
 

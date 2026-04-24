@@ -3,7 +3,9 @@ class IntentClassifier:
     def classify(prompt: str) -> str:
         # A simple keyword-based intent classifier for now
         p = prompt.lower()
-        if "preprocess" in p or "normalize" in p or "clean" in p or "reshape" in p:
+        if "visualize" in p or "plot" in p or "graph" in p or "chart" in p or "draw" in p:
+            return "visualize_data"
+        elif "preprocess" in p or "normalize" in p or "clean" in p or "reshape" in p:
             return "preprocess_data"
         elif "analyze" in p or "explore" in p or "stats" in p or "stat" in p:
             return "analyze_data"

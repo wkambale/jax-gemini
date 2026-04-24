@@ -170,6 +170,12 @@ class JaxGemini:
             prompt, intent="analyze_data", runtime_args={"dataset": dataset}
         )
 
+    def visualize_data(self, prompt: str, dataset: Any) -> Any:
+        """Visualize a given dataset by plotting."""
+        return self._generate_and_execute(
+            prompt, intent="visualize_data", runtime_args={"dataset": dataset}
+        )
+
     def explain(self) -> str:
         """Return a plain-English explanation of the last generated code."""
         if not self._last_code:
