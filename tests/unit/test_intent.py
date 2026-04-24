@@ -25,3 +25,5 @@ class TestIntentClassifier:
             == "preprocess_data"
         )
         assert IntentClassifier.classify("analyze data to find mean") == "analyze_data"
+        assert IntentClassifier.classify("plot the training curve") == "visualize_data"
+        assert IntentClassifier.classify("visualize the dataset distribution") == "visualize_data"

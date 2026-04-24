@@ -46,6 +46,7 @@ __all__ = [
     "save",
     "show_code",
     "train",
+    "visualize_data",
 ]
 
 # Module-level singleton for simple usage pattern (jg.build, jg.train, etc.)
@@ -63,3 +64,4 @@ reset = _default_agent.reset
 load_data = _default_agent.load_data
 preprocess_data = _default_agent.preprocess_data
 analyze_data = _default_agent.analyze_data
+visualize_data = _default_agent.visualize_data

@@ -12,6 +12,13 @@ try:
 except ImportError:
     _orbax_available = False
 
+try:
+    import matplotlib.pyplot as plt
+
+    _matplotlib_available = True
+except ImportError:
+    _matplotlib_available = False
+
 import builtins
 
 SAFE_BUILTINS = {
@@ -72,6 +79,10 @@ if _orbax_available:
 
     BASE_NAMESPACE["ocp"] = ocp
     BASE_NAMESPACE["orbax"] = __import__("orbax")
+
+if _matplotlib_available:
+    BASE_NAMESPACE["plt"] = plt
+    BASE_NAMESPACE["matplotlib"] = __import__("matplotlib")
 
 
 def get_execution_namespace() -> dict:

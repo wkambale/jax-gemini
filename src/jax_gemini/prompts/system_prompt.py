@@ -180,7 +180,8 @@ Let's assume the user will pass the architecture if needed, or we just load para
 RULES:
 - The function MUST be named `load_model`.
 - Signature: `load_model(path: str) -> Any`
-- Given the path, load and construct the model. Wait, NNX allows returning state or constructing if class is known.
+- Given the path, load and construct the model. Wait, NNX allows returning state
+  or constructing if class is known.
 For simplicity, since users do not write code, we might just unpickle? No, orbax.
 We will let Gemini try to figure out load.
 
@@ -247,6 +248,26 @@ RULES:
 Respond ONLY with JSON matching:
 {
     "intent": "analyze_data",
+    "code": "<python code>",
+    "description": "<plain English explanation>",
+    "warnings": []
+}
+"""
+
+VISUALIZE_DATA_SYSTEM_PROMPT = """
+You are an expert Data Scientist.
+Generate code to visualize or plot a dataset.
+
+RULES:
+- The function MUST be named `visualize_data`.
+- Signature: `visualize_data(dataset: Any) -> Any`
+- Use matplotlib.pyplot natively to generate the plot requested.
+- You can save the plot, or simply show it, or return the figure axis.
+- Only import from: jax, jax.numpy, numpy, math, typing, matplotlib, matplotlib.pyplot as plt.
+
+Respond ONLY with JSON matching:
+{
+    "intent": "visualize_data",
     "code": "<python code>",
     "description": "<plain English explanation>",
     "warnings": []

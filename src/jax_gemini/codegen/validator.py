@@ -13,6 +13,7 @@ WHITELIST_IMPORTS: frozenset[str] = frozenset(
         "math",
         "typing",
         "dataclasses",
+        "matplotlib",
     }
 )
 
@@ -52,6 +53,7 @@ REQUIRED_FUNCTION_NAMES: dict[str, str] = {
     "load_data": "load_data",
     "preprocess_data": "preprocess_data",
     "analyze_data": "analyze_data",
+    "visualize_data": "visualize_data",
 }
 
 MAX_CODE_LINES = 200
@@ -79,7 +81,10 @@ class CodeValidator:
         try:
             tree = ast.parse(code)
         except SyntaxError as e:
-            raise JaxGeminiValidationError(f"Generated code has a syntax error: {e}", code=code)
+            raise JaxGeminiValidationError(
+                f"Generated code has a syntax error: {e}",
+                code=code
+            ) from e
 
         # 3. Walk AST and check every node
         for node in ast.walk(tree):
