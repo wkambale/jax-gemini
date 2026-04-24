@@ -37,9 +37,9 @@ class GeminiLLM(AbstractLLM):
             raise JaxGeminiLLMError(
                 f"Gemini returned invalid JSON: {e}",
                 raw_response=response.text if (response and hasattr(response, "text")) else "",
-            )
+            ) from e
         except Exception as e:
-            raise JaxGeminiLLMError(f"Gemini API error: {e}")
+            raise JaxGeminiLLMError(f"Gemini API error: {e}") from e
 
     def is_available(self) -> bool:
         try:

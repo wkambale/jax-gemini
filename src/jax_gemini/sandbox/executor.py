@@ -10,6 +10,10 @@ INTENT_FUNCTION_MAP: dict[str, str] = {
     "evaluate": "evaluate_model",
     "save": "save_model",
     "load": "load_model",
+    "load_data": "load_data",
+    "preprocess_data": "preprocess_data",
+    "analyze_data": "analyze_data",
+    "visualize_data": "visualize_data",
 }
 
 INTENT_DEFAULT_ARGS: dict[str, dict] = {
@@ -56,7 +60,7 @@ class SandboxExecutor:
                 f"Code failed during definition phase: {e}\n\n{tb}",
                 code=code,
                 attempts=1,
-            )
+            ) from e
 
         if fn_name not in namespace:
             raise JaxGeminiExecutionError(
@@ -75,4 +79,4 @@ class SandboxExecutor:
                 f"{type(e).__name__}: {e}\n\nTraceback:\n{tb}",
                 code=code,
                 attempts=1,
-            )
+            ) from e

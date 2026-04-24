@@ -9,7 +9,7 @@ def main():
     jg.config.set({"model_name": "gemini-3.1-pro"})
 
     print("Generating synthetic data...")
-    dataset = np.random.randn(100, 2)
+    _ = np.random.randn(100, 2)
 
     # We will just print the prompts to show end to end capability.
     # Since we don't have the API key in the automated runner environment,
@@ -17,7 +17,7 @@ def main():
 
     print("Building Data Pipeline...")
     try:
-        loaded_data = jg.load_data("Load a synthetic dataset of 100 rows and 2 columns from memory")
+        _ = jg.load_data("Load a synthetic dataset of 100 rows and 2 columns from memory")
         print("Data loaded successfully.")
     except Exception as e:
         print(f"Skipping actual API call due to missing key: {e}")

@@ -180,7 +180,8 @@ Let's assume the user will pass the architecture if needed, or we just load para
 RULES:
 - The function MUST be named `load_model`.
 - Signature: `load_model(path: str) -> Any`
-- Given the path, load and construct the model. Wait, NNX allows returning state or constructing if class is known.
+- Given the path, load and construct the model. Wait, NNX allows returning state
+  or constructing if class is known.
 For simplicity, since users do not write code, we might just unpickle? No, orbax.
 We will let Gemini try to figure out load.
 
