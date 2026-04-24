@@ -154,6 +154,22 @@ class JaxGemini:
         self._current_model = model
         return model
 
+    def load_data(self, prompt: str) -> Any:
+        """Load a dataset based on natural language description."""
+        return self._generate_and_execute(prompt, intent="load_data")
+
+    def preprocess_data(self, prompt: str, dataset: Any) -> Any:
+        """Preprocess a given dataset based on natural language instruction."""
+        return self._generate_and_execute(
+            prompt, intent="preprocess_data", runtime_args={"dataset": dataset}
+        )
+
+    def analyze_data(self, prompt: str, dataset: Any) -> Any:
+        """Analyze a given dataset and return statistics or representations."""
+        return self._generate_and_execute(
+            prompt, intent="analyze_data", runtime_args={"dataset": dataset}
+        )
+
     def explain(self) -> str:
         """Return a plain-English explanation of the last generated code."""
         if not self._last_code:

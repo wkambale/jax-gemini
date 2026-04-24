@@ -22,6 +22,12 @@ class ContextBuilder:
             sys_prompt = system_prompt.SAVE_SYSTEM_PROMPT
         elif intent == "load":
             sys_prompt = system_prompt.LOAD_SYSTEM_PROMPT
+        elif intent == "load_data":
+            sys_prompt = system_prompt.LOAD_DATA_SYSTEM_PROMPT
+        elif intent == "preprocess_data":
+            sys_prompt = system_prompt.PREPROCESS_DATA_SYSTEM_PROMPT
+        elif intent == "analyze_data":
+            sys_prompt = system_prompt.ANALYZE_DATA_SYSTEM_PROMPT
         else:
             sys_prompt = system_prompt.BUILD_SYSTEM_PROMPT
 
