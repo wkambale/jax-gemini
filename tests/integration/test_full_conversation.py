@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-import jax_gemini as jg
+import jaxforge as jf
 
 MOCK_MODIFY_RESPONSE = {
     "intent": "build",
@@ -20,7 +20,7 @@ MOCK_MODIFY_RESPONSE = {
 
 
 class TestFullConversation:
-    @patch("jax_gemini.llm.gemini.genai")
+    @patch("jaxforge.llm.gemini.genai")
     def test_full_conversation(self, mock_genai, config):
         import json
 
@@ -28,7 +28,7 @@ class TestFullConversation:
         mock_response.text = json.dumps(MOCK_MODIFY_RESPONSE)
         mock_genai.GenerativeModel.return_value.generate_content.return_value = mock_response
 
-        agent = jg.JaxGemini(config=config)
+        agent = jf.JaxForge(config=config)
         agent.build("Build a model")
         agent.modify("Change hidden to 512")
 

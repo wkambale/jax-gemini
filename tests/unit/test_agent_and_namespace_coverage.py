@@ -4,14 +4,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-import jax_gemini as jg
-from jax_gemini.exceptions import (
-    JaxGeminiExecutionError,
-    JaxGeminiLLMError,
-    JaxGeminiValidationError,
+import jaxforge as jf
+from jaxforge.exceptions import (
+    JaxForgeExecutionError,
+    JaxForgeLLMError,
+    JaxForgeValidationError,
 )
-from jax_gemini.sandbox import namespace as ns_mod
-from jax_gemini.sandbox.executor import _run_with_timeout, _SandboxTimeoutError
+from jaxforge.sandbox import namespace as ns_mod
+from jaxforge.sandbox.executor import _run_with_timeout, _SandboxTimeoutError
 
 
 class TestAgentAndNamespaceCoverage:
@@ -96,9 +96,9 @@ class TestAgentAndNamespaceCoverage:
             viz_ns["plt"].savefig(str(outside / "plt.png"))
         assert isinstance(viz_ns["plt"].figure(), _FakeFig)
 
-    @patch("jax_gemini.llm.gemini.genai")
+    @patch("jaxforge.llm.gemini.genai")
     def test_agent_data_methods_explain_show_code_and_retry_exhaustion(self, mock_genai):
-        agent = jg.JaxGemini(jg.JaxGeminiConfig(gemini_api_key="test-key", max_retries=2))
+        agent = jf.JaxForge(jf.JaxForgeConfig(gemini_api_key="test-key", max_retries=2))
         assert "No code has been generated yet" in agent.explain()
         assert "No code has been generated yet" in agent.show_code()
 
@@ -137,25 +137,25 @@ class TestAgentAndNamespaceCoverage:
         assert agent.analyze_data("analyze", data) == {"count": 2}
         assert agent.visualize_data("plot", data) == "fig"
 
-        # Retry exhaustion raises JaxGeminiLLMError
+        # Retry exhaustion raises JaxForgeLLMError
         mock_genai.GenerativeModel.return_value.generate_content.side_effect = [
             MagicMock(text="{bad"),
             MagicMock(text="{still bad"),
         ]
-        with pytest.raises(JaxGeminiLLMError):
+        with pytest.raises(JaxForgeLLMError):
             agent.build("Build model")
 
-        # Retry exhaustion raises JaxGeminiValidationError
+        # Retry exhaustion raises JaxForgeValidationError
         bad_val = _resp("build", "import os\ndef build_model(rngs): return 1\n")
         mock_genai.GenerativeModel.return_value.generate_content.side_effect = [bad_val, bad_val]
-        with pytest.raises(JaxGeminiValidationError):
+        with pytest.raises(JaxForgeValidationError):
             agent.build("Build model")
 
-        # Retry exhaustion raises JaxGeminiExecutionError
+        # Retry exhaustion raises JaxForgeExecutionError
         bad_exec = _resp("build", "def build_model(rngs):\n    raise ValueError('boom')\n")
         mock_genai.GenerativeModel.return_value.generate_content.side_effect = [
             bad_exec,
             bad_exec,
         ]
-        with pytest.raises(JaxGeminiExecutionError, match="All 2 attempts failed"):
+        with pytest.raises(JaxForgeExecutionError, match="All 2 attempts failed"):
             agent.build("Build model")

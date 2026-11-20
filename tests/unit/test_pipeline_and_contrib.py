@@ -4,16 +4,16 @@ import flax.nnx as nnx
 import jax.numpy as jnp
 import pytest
 
-from jax_gemini import JaxGemini, JaxGeminiConfig
-from jax_gemini.contrib import (
+from jaxforge import JaxForge, JaxForgeConfig
+from jaxforge.contrib import (
     available_optimizers,
     count_opt_steps,
     count_parameters,
     create_optimizer,
     summarize_module,
 )
-from jax_gemini.exceptions import JaxGeminiCheckpointError, JaxGeminiIntentError
-from jax_gemini.pipeline import ModelBuilder, ModelEvaluator, ModelExporter, ModelTrainer
+from jaxforge.exceptions import JaxForgeCheckpointError, JaxForgeIntentError
+from jaxforge.pipeline import ModelBuilder, ModelEvaluator, ModelExporter, ModelTrainer
 
 
 class _TinyNet(nnx.Module):
@@ -26,7 +26,7 @@ class _TinyNet(nnx.Module):
 
 class TestPipelineAndContrib:
     def test_agent_run_routes_via_intent_classifier(self, monkeypatch):
-        agent = JaxGemini(config=JaxGeminiConfig(gemini_api_key="test-key"))
+        agent = JaxForge(config=JaxForgeConfig(gemini_api_key="test-key"))
         monkeypatch.setattr(agent, "build", MagicMock(return_value="built"))
         monkeypatch.setattr(agent, "modify", MagicMock(return_value="modified"))
         monkeypatch.setattr(agent, "train", MagicMock(return_value=("m", {"loss": 0.1})))
@@ -50,15 +50,15 @@ class TestPipelineAndContrib:
         assert agent.run("analyze the dataset", dataset=(1, 2)) == "stats"
         assert agent.run("plot training curve", dataset=(1, 2)) == "fig"
 
-        with pytest.raises(JaxGeminiCheckpointError):
+        with pytest.raises(JaxForgeCheckpointError):
             agent.run("save checkpoint")
-        with pytest.raises(JaxGeminiCheckpointError):
+        with pytest.raises(JaxForgeCheckpointError):
             agent.run("load checkpoint")
-        with pytest.raises(JaxGeminiIntentError):
+        with pytest.raises(JaxForgeIntentError):
             agent.run("analyze the dataset")
 
     def test_pipeline_helpers_orchestrate_agent(self):
-        mock_agent = MagicMock(spec=JaxGemini)
+        mock_agent = MagicMock(spec=JaxForge)
         mock_agent.build.return_value = "m0"
         mock_agent.modify.return_value = "m1"
         mock_agent.train.return_value = ("m_trained", {"accuracy": 0.95})

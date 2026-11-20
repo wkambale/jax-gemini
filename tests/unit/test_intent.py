@@ -1,7 +1,7 @@
 import pytest
 
-from jax_gemini.exceptions import JaxGeminiIntentError
-from jax_gemini.prompts.intent import IntentClassifier
+from jaxforge.exceptions import JaxForgeIntentError
+from jaxforge.prompts.intent import IntentClassifier
 
 
 class TestIntentClassifier:
@@ -36,7 +36,7 @@ class TestIntentClassifier:
         assert IntentClassifier.classify("train model to prevent overfitting") == "train"
         assert IntentClassifier.classify("evaluate latest model state") == "evaluate"
 
-        with pytest.raises(JaxGeminiIntentError):
+        with pytest.raises(JaxForgeIntentError):
             IntentClassifier.classify("")
-        with pytest.raises(JaxGeminiIntentError):
+        with pytest.raises(JaxForgeIntentError):
             IntentClassifier.classify("hello there")

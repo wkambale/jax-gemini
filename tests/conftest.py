@@ -2,12 +2,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from jax_gemini.config import JaxGeminiConfig
+from jaxforge.config import JaxForgeConfig
 
 
 @pytest.fixture
-def config() -> JaxGeminiConfig:
-    return JaxGeminiConfig(
+def config() -> JaxForgeConfig:
+    return JaxForgeConfig(
         gemini_api_key="test-key-not-real",
         verbose=False,
         max_retries=2,

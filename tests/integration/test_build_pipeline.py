@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-import jax_gemini as jg
+import jaxforge as jf
 
 MOCK_BUILD_RESPONSE = {
     "intent": "build",
@@ -22,7 +22,7 @@ MOCK_BUILD_RESPONSE = {
 
 
 class TestBuildPipeline:
-    @patch("jax_gemini.llm.gemini.genai")
+    @patch("jaxforge.llm.gemini.genai")
     def test_build_returns_flax_module(self, mock_genai, config):
         import json
 
@@ -30,13 +30,13 @@ class TestBuildPipeline:
         mock_response.text = json.dumps(MOCK_BUILD_RESPONSE)
         mock_genai.GenerativeModel.return_value.generate_content.return_value = mock_response
 
-        agent = jg.JaxGemini(config=config)
+        agent = jf.JaxForge(config=config)
         model = agent.build("Build a model")
         assert model is not None
         assert callable(model)
 
     def test_build_without_api_key_raises_config_error(self, monkeypatch):
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-        agent = jg.JaxGemini(jg.JaxGeminiConfig(gemini_api_key=None))
-        with pytest.raises(jg.JaxGeminiConfigError):
+        agent = jf.JaxForge(jf.JaxForgeConfig(gemini_api_key=None))
+        with pytest.raises(jf.JaxForgeConfigError):
             agent.build("Build a model")

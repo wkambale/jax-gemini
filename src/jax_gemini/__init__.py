@@ -1,29 +1,69 @@
-"""
-jax-gemini: Natural language-driven JAX/Flax model building powered by Gemini.
+"""Backward-compatibility shim redirecting jax_gemini imports to jaxforge."""
 
-Quick start:
-    import jax_gemini as jg
-    jg.config.set({"gemini_api_key": "YOUR_KEY"})
-    model = jg.build("Build a 3-layer MLP for image classification")
-"""
+import warnings
 
-from jax_gemini.agent import JaxGemini
-from jax_gemini.config import JaxGeminiConfig
-from jax_gemini.exceptions import (
-    JaxGeminiCheckpointError,
-    JaxGeminiConfigError,
-    JaxGeminiError,
-    JaxGeminiExecutionError,
-    JaxGeminiIntentError,
-    JaxGeminiLLMError,
-    JaxGeminiValidationError,
+from jaxforge import (
+    JaxForge as JaxGemini,
+)
+from jaxforge import (
+    JaxForgeApprovalError,
+    __author__,
+    __license__,
+    __version__,
+    analyze_data,
+    build,
+    config,
+    evaluate,
+    explain,
+    explore,
+    export_project,
+    load,
+    load_data,
+    modify,
+    preprocess_data,
+    preview,
+    reset,
+    run,
+    save,
+    show_code,
+    train,
+    usage_summary,
+    visualize_data,
+)
+from jaxforge import (
+    JaxForgeCheckpointError as JaxGeminiCheckpointError,
+)
+from jaxforge import (
+    JaxForgeConfig as JaxGeminiConfig,
+)
+from jaxforge import (
+    JaxForgeConfigError as JaxGeminiConfigError,
+)
+from jaxforge import (
+    JaxForgeError as JaxGeminiError,
+)
+from jaxforge import (
+    JaxForgeExecutionError as JaxGeminiExecutionError,
+)
+from jaxforge import (
+    JaxForgeIntentError as JaxGeminiIntentError,
+)
+from jaxforge import (
+    JaxForgeLLMError as JaxGeminiLLMError,
+)
+from jaxforge import (
+    JaxForgeValidationError as JaxGeminiValidationError,
 )
 
-__version__ = "0.1.3"
-__author__ = "Wesley Kambale"
-__license__ = "MIT"
+warnings.warn(
+    "jax_gemini is deprecated and has been renamed to jaxforge. "
+    "Install 'jaxforge' and use 'import jaxforge as jf'.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = [
+    "JaxForgeApprovalError",
     "JaxGemini",
     "JaxGeminiCheckpointError",
     "JaxGeminiConfig",
@@ -33,38 +73,26 @@ __all__ = [
     "JaxGeminiIntentError",
     "JaxGeminiLLMError",
     "JaxGeminiValidationError",
+    "__author__",
+    "__license__",
+    "__version__",
     "analyze_data",
     "build",
     "config",
     "evaluate",
     "explain",
+    "explore",
+    "export_project",
     "load",
     "load_data",
     "modify",
     "preprocess_data",
+    "preview",
     "reset",
     "run",
     "save",
     "show_code",
     "train",
+    "usage_summary",
     "visualize_data",
 ]
-
-# Module-level singleton for single-session interactive usage (jg.build, jg.train, etc.).
-# Multi-user or concurrent callers must instantiate separate JaxGemini() instances.
-_default_agent = JaxGemini()
-config = _default_agent.config
-build = _default_agent.build
-modify = _default_agent.modify
-train = _default_agent.train
-evaluate = _default_agent.evaluate
-save = _default_agent.save
-load = _default_agent.load
-explain = _default_agent.explain
-show_code = _default_agent.show_code
-reset = _default_agent.reset
-load_data = _default_agent.load_data
-preprocess_data = _default_agent.preprocess_data
-analyze_data = _default_agent.analyze_data
-visualize_data = _default_agent.visualize_data
-run = _default_agent.run

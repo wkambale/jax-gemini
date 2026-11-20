@@ -1,7 +1,7 @@
 import pytest
 
-from jax_gemini.codegen.parser import CodeParser
-from jax_gemini.exceptions import JaxGeminiLLMError
+from jaxforge.codegen.parser import CodeParser
+from jaxforge.exceptions import JaxForgeLLMError
 
 
 class TestParser:
@@ -11,20 +11,20 @@ class TestParser:
 
     def test_missing_code_raises(self):
         response = {"intent": "build"}
-        with pytest.raises(JaxGeminiLLMError, match="missing 'code'"):
+        with pytest.raises(JaxForgeLLMError, match="missing 'code'"):
             CodeParser.extract(response, "build")
 
     def test_empty_code_raises(self):
         response = {"code": "   ", "intent": "build"}
-        with pytest.raises(JaxGeminiLLMError, match="empty code block"):
+        with pytest.raises(JaxForgeLLMError, match="empty code block"):
             CodeParser.extract(response, "build")
 
     def test_non_string_code_raises(self):
         response = {"code": 123, "intent": "build"}
-        with pytest.raises(JaxGeminiLLMError, match="must be a string"):
+        with pytest.raises(JaxForgeLLMError, match="must be a string"):
             CodeParser.extract(response, "build")
 
     def test_mismatched_intent_raises(self):
         response = {"code": "def train_model(): pass", "intent": "train"}
-        with pytest.raises(JaxGeminiLLMError, match="does not match"):
+        with pytest.raises(JaxForgeLLMError, match="does not match"):
             CodeParser.extract(response, "build")

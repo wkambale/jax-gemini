@@ -1,34 +1,32 @@
 # Architecture internals
 
-`jax-gemini` separates prompt orchestration, AST safety validation, isolated runtime execution, conversation memory, and composable ML pipeline helpers into dedicated modules.
+`jaxforge` separates multi-provider LLM orchestration, dataset profiling, diff patching, AST validation, pluggable execution sandboxes, experiment search, and standalone package export into modular subsystems.
 
 ## Core modules overview
 
 ### `llm/`
-Handles Gemini API integration and structured JSON schema generation (`application/json`) with thread-safe credential scoping and configured request timeouts.
-- **`base.py`**: Abstract LLM client interface (`AbstractLLM`).
-- **`gemini.py`**: `GeminiLLM` implementation calling Google Gemini with `request_options={"timeout": ...}` and guarded response extraction.
+Provider-agnostic LLM layer with primary/fast model routing and token/latency telemetry (`LLMUsage`).
+- **`base.py`**: `AbstractLLM` and `LLMUsage`.
+- **`gemini.py`**: `GeminiLLM` supporting `google-genai` or zero-dependency HTTPS REST without deprecated `google-generativeai` imports.
+- **`providers.py`**: `OpenAICompatibleLLM` (OpenAI, OpenRouter, Ollama, vLLM), `AnthropicLLM`, `LiteLLMBackend`, `RouterLLM`, and `create_llm()`.
 
-### `prompts/`
-Manages intent classification, system prompt templates, and bounded session context assembly.
-- **`intent.py`**: Word-boundary rule-based `IntentClassifier` routing natural-language prompts (`jg.run()`).
-- **`context_builder.py`**: Enforces prompt length bounds, preserves alternating `user` and `model` turn structure, bounds conversation history, and injects `current_model_state`.
-- **`system_prompt.py`**: Task-specific instructions for model building, training, evaluation, checkpointing, and data pipeline intents.
+### `prompts/` and `plan.py`
+Manages intent classification, framework detection, privacy-preserving `DatasetProfile` summaries, `GeneratedPlan` previews, and bounded session context assembly.
+- **`intent.py`**: Word-boundary `IntentClassifier` plus Equinox/Flax framework inference.
+- **`context_builder.py`**: Enforces prompt bounds, alternates `user` and `model` turns, injects `current_model_state` and `DatasetProfile`, and enables `DIFF_MODIFY_SYSTEM_PROMPT`.
 
 ### `codegen/`
-Translates model JSON payloads into verified Python source code.
-- **`parser.py`**: Extracts `code` from structured JSON payloads and rejects intent mismatches.
-- **`validator.py`**: `CodeValidator` performs AST inspection, enforcing byte, line, and node budgets, intent-scoped import allowlists, blocked submodules, blocked builtins, names, and attributes, bare `except:` rejection, pickle guards, and top-level side-effect restrictions.
-- **`fixer.py`**: `CodeFixer` redacts filesystem paths and credentials and uses dynamic markdown fencing in self-healing retry prompts.
+Translates model JSON payloads into verified source code.
+- **`parser.py`**: Extracts `code` or applies unified diffs cleanly against `previous_code` via `diff.py`.
+- **`validator.py`**: `CodeValidator` performs AST inspection, enforcing byte, line, and node budgets, intent-scoped import allowlists (including optional Equinox, Grain, and Safetensors), blocked submodules, blocked builtins, names, and reflection attributes, bare `except:` rejection, and pickle guards.
+- **`fixer.py`**: `CodeFixer` redacts paths and secrets, adds dynamic markdown fencing, and appends JAX/XLA diagnostic hints (`ConcretizationTypeError`, shape mismatch, signature errors).
 
 ### `sandbox/`
-Isolates generated code execution from the host environment.
-- **`executor.py`**: `SandboxExecutor` re-validates code, runs it in a dedicated daemon thread under trace deadlines and join timeouts (`config.timeout_seconds`), and raises unswallowable timeout errors.
-- **`namespace.py`**: Builds per-execution `MappingProxyType`-protected builtins, controlled `_safe_import`, and `WeakKeyDictionary`-backed `_SafeModuleProxy` wrappers with confined path checks across `numpy`, `orbax`, and `matplotlib`.
+Isolates execution via a pluggable `ExecutionBackend` protocol.
+- **`backends.py`**: `ThreadSandboxBackend` (trace deadline + unswallowable `_SandboxTimeoutError`), `SubprocessSandboxBackend` (`subprocess` + `resource.setrlimit` memory limits), `DockerSandboxBackend`, `E2BSandboxBackend`, and `ModalSandboxBackend`.
+- **`namespace.py`**: Builds per-execution `WeakKeyDictionary`-backed `_SafeModuleProxy` wrappers with confined path checks across `numpy`, `orbax`, `safetensors`, and `matplotlib`.
 
-### `memory/`
-- **`conversation.py`**: `ConversationMemory` stores bounded turn history and `ModelState` snapshots.
-
-### `pipeline/` and `contrib/`
-- **`pipeline/`**: High-level composable helpers (`ModelBuilder`, `ModelTrainer`, `ModelEvaluator`, `ModelExporter`).
-- **`contrib/`**: Flax NNX and Optax utilities (`count_parameters`, `summarize_module`, `available_optimizers`, `create_optimizer`, `count_opt_steps`).
+### `contrib/`, `pipeline/`, `exporter.py`, `cli.py`, and `mcp_server.py`
+- **`contrib/`**: Flax `eval_shape_summary` and parameter counters, Optax optimizers/cosine schedules, `jax.sharding` mesh helpers, and `MetricsTracker` implementations.
+- **`exporter.py`**: Generates clean standalone packages (`src/`, `pyproject.toml`, smoke tests).
+- **`cli.py` and `mcp_server.py`**: Terminal CLI and MCP tool server for external IDE agents.

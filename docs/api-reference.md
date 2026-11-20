@@ -1,79 +1,67 @@
 # API reference
 
-`jax-gemini` exposes top-level session functions (`jg.build`, `jg.train`, and peers backed by a default `JaxGemini` instance) for interactive use, as well as the `JaxGemini` class for isolated multi-session or programmatic usage.
+`jaxforge` exposes top-level session functions (`jf.preview`, `jf.build`, `jf.train`, `jf.explore`, `jf.export_project`) backed by a default `JaxForge` instance, plus the `JaxForge` class for isolated multi-session or server workflows. Backward-compatible `jax_gemini` imports emit a `DeprecationWarning` and alias directly to `JaxForge`.
 
 ---
 
-### `jg.config.set(updates: dict) -> None`
+### `jf.config.set(updates: dict) -> None`
 
-Atomically validates and applies configuration updates on `JaxGeminiConfig`. Invalid keys or out-of-range values roll back cleanly and raise `JaxGeminiConfigError`.
+Atomically validates and applies updates on `JaxForgeConfig`.
 
 **Fields:**
-- `gemini_api_key` *(str | None)*: Gemini API key (Default: `None`, reads `GEMINI_API_KEY` from environment on demand).
-- `model_name` *(str)*: Gemini model identifier (Default: `"gemini-3.1-pro"`).
+- `provider` *(str)*: `"auto"`, `"google"`, `"openai"`, `"anthropic"`, `"ollama"`, `"openrouter"`, or `"litellm"` (Default: `"auto"`).
+- `model_name` *(str)*: Target model or `provider:model` prefix spec (Default: `"gemini-3.1-pro"`).
+- `fast_model_name` *(str | None)*: Optional faster model used for retry repairs (Default: `None`).
+- `api_key` / `gemini_api_key` *(str | None)*: API key (reads matching env var when unset).
+- `base_url` *(str | None)*: Optional HTTP(S) base URL for Ollama, vLLM, or custom proxies.
+- `framework` *(str)*: `"flax"`, `"equinox"`, or `"auto"` (Default: `"flax"`).
+- `execution_backend` *(str)*: `"thread"`, `"subprocess"`, `"docker"`, `"e2b"`, or `"modal"` (Default: `"thread"`).
+- `max_memory_mb` *(int | None)*: Memory limit for `subprocess` and `docker` backends (Default: `None`).
+- `auto_approve` *(bool)*: Require explicit `approve=` callback when `False` (Default: `True`).
 - `temperature` *(float)*: Sampling temperature in `[0.0, 1.0]` (Default: `0.2`).
 - `max_output_tokens` *(int)*: Maximum output tokens in `[1, 65536]` (Default: `4096`).
-- `max_retries` *(int)*: Generation and execution retry attempts in `[1, 5]` (Default: `3`).
-- `verbose` *(bool)*: Print internal execution logs (Default: `False`).
-- `checkpoint_dir` *(str)*: Base directory for confined checkpoint persistence (Default: `"./jax_gemini_checkpoints"`).
-- `timeout_seconds` *(int)*: Per-step LLM request and sandbox execution timeout in `[1, 3600]` (Default: `60`).
+- `max_retries` *(int)*: Generation retry attempts in `[1, 5]` (Default: `3`).
+- `timeout_seconds` *(int)*: Request and sandbox timeout in `[1, 3600]` (Default: `60`).
+- `checkpoint_dir` *(str)*: Confined base directory for checkpoints (Default: `"./jaxforge_checkpoints"`).
+- `verbose` *(bool)*: Print execution logs (Default: `False`).
 
 ---
 
-### `jg.run(prompt: str, dataset: Any = None, name: str | None = None) -> Any`
+### `jf.preview(prompt: str, intent: str | None = None, dataset: Any = None, diff_mode: bool = False) -> GeneratedPlan`
 
-Classifies `prompt` with `IntentClassifier` and routes it automatically to `build`/`modify`, `train`, `evaluate`, `save`, `load`, `load_data`, `preprocess_data`, `analyze_data`, or `visualize_data`.
-
----
-
-### `jg.build(prompt: str) -> Any`
-
-Generates, validates, and executes a `flax.nnx.Module` from a natural-language architecture description and sets it as the active session model.
+Generates and AST-validates code without executing it, returning a `GeneratedPlan` with optional unified diffs and Jupyter HTML rendering. Use `agent.execute_plan(plan, ...)` to execute after approval.
 
 ---
 
-### `jg.modify(prompt: str) -> Any`
+### `jf.build` / `jf.modify` / `jf.train` / `jf.evaluate` / `jf.run`
 
-Refines the current model based on a natural-language instruction while preserving session history and active model context.
-
----
-
-### `jg.train(prompt: str, dataset: tuple | None = None) -> tuple[Any, dict]`
-
-Generates and runs an Optax training loop over `dataset`, returning `(trained_model, metrics_dict)`.
+All primary execution methods accept `dry_run: bool = False` and `approve: Callable[[GeneratedPlan], bool] | None = None` for inspect-first gates, and async variants `abuild`, `amodify`, `atrain`, `aevaluate`, and `apreview` on `JaxForge`.
 
 ---
 
-### `jg.evaluate(prompt: str, dataset: tuple | None = None) -> dict`
+### `jf.explore(prompt: str, dataset: Any, metric: str = "accuracy", maximize: bool = True, candidates: int = 3) -> ExperimentResult`
 
-Evaluates the active model on `(X_test, y_test)` and returns a metrics dictionary.
-
----
-
-### `jg.save(name: str) -> str` and `jg.load(name: str) -> Any`
-
-Saves or restores the active model checkpoint under a relative `name` strictly contained inside `config.checkpoint_dir`.
+Runs bounded branching trials across optimization strategies and promotes the highest-scoring candidate model.
 
 ---
 
-### Data pipeline methods
+### `jf.export_project(output_dir: str | Path, package_name: str = "generated_model") -> Path`
 
-- `jg.load_data(prompt: str) -> Any`: Load or synthesize a dataset in memory.
-- `jg.preprocess_data(prompt: str, dataset: Any) -> Any`: Transform or normalize an existing dataset.
-- `jg.analyze_data(prompt: str, dataset: Any) -> Any`: Compute dataset statistics or summaries.
-- `jg.visualize_data(prompt: str, dataset: Any) -> Any`: Generate plots or figures (requires `jax-gemini[viz]`).
+Writes generated `model.py`, optional `train.py` and `eval.py`, `pyproject.toml`, and `tests/test_smoke.py` into `output_dir`.
 
 ---
 
-### Inspection and session control
+### Data pipeline, checkpoints, telemetry, and inspection
 
-- `jg.explain() -> str`: Return Gemini's plain-English description of the last generated code.
-- `jg.show_code() -> str`: Return the validated Python source string from the last operation.
-- `jg.reset() -> None`: Clear conversation memory, cached LLM client, last code or response metadata, and active model state.
+- `jf.save(name)` and `jf.load(name)`: Confined Orbax/Safetensors persistence inside `checkpoint_dir`.
+- `jf.load_data()`, `jf.preprocess_data()`, `jf.analyze_data()`, `jf.visualize_data()`: Confined dataset operations profiled automatically by `DatasetProfile`.
+- `jf.explain()`, `jf.show_code()`, `jf.usage_summary()`, `jf.reset()`: Inspection, token/latency accounting, and session reset.
 
 ---
 
-### Pipeline and contrib helpers
+### CLI, MCP, pipeline, and contrib helpers
 
-- `jax_gemini.pipeline`: `ModelBuilder`, `ModelTrainer`, `ModelEvaluator`, `ModelExporter`.
-- `jax_gemini.contrib`: `count_parameters`, `summarize_module`, `available_optimizers`, `create_optimizer`, `count_opt_steps`.
+- CLI entrypoint: `jaxforge {info,devices,validate,preview,run,mcp}`.
+- `jaxforge.mcp_server`: `tool_validate_jax_code`, `tool_device_summary`, `tool_run_sandboxed_jax`, and `serve_stdio()`.
+- `jaxforge.pipeline`: `ModelBuilder`, `ModelTrainer`, `ModelEvaluator`, `ModelExporter`.
+- `jaxforge.contrib`: `count_parameters`, `summarize_module`, `eval_shape_summary`, `available_optimizers`, `create_optimizer`, `create_cosine_schedule`, `count_opt_steps`, `device_summary`, `create_device_mesh`, `make_replicated_sharding`, `make_data_sharding`, `InMemoryTracker`, `JsonlTracker`, `create_tracker`.

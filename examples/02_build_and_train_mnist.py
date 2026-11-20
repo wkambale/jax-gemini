@@ -2,14 +2,14 @@ import os
 
 import numpy as np
 
-import jax_gemini as jg
+import jaxforge as jf
 
 
 def main():
-    jg.config.set({"gemini_api_key": os.environ.get("GEMINI_API_KEY", "dummy")})
+    jf.config.set({"gemini_api_key": os.environ.get("GEMINI_API_KEY", "dummy")})
 
     # 1. Build
-    jg.build("Build a CNN for MNIST mapping 28x28 grayscale to 10 classes.")
+    jf.build("Build a CNN for MNIST mapping 28x28 grayscale to 10 classes.")
 
     # Generate dummy MNIST data
     X = np.random.randn(100, 28, 28, 1).astype(np.float32)
@@ -17,7 +17,7 @@ def main():
 
     # 2. Train
     print("Training model...")
-    _model, metrics = jg.train("Train for 3 epochs using SGD", dataset=(X, y))
+    _model, metrics = jf.train("Train for 3 epochs using SGD", dataset=(X, y))
 
     print("Metrics:", metrics)
 
