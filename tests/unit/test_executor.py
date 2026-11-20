@@ -191,3 +191,31 @@ class TestSandboxExecutor:
         )
         with pytest.raises(JaxGeminiExecutionError, match="timed out"):
             self.executor.run(loop_code, "build", {"rngs": None}, timeout_seconds=0.1)
+
+    def test_timeout_and_namespace_direct_guards(self, tmp_path):
+        from jax_gemini.sandbox.executor import _run_with_timeout
+        from jax_gemini.sandbox.namespace import (
+            _resolve_confined_path,
+            _safe_import,
+            get_execution_namespace,
+        )
+
+        with pytest.raises(ValueError, match="positive"):
+            _run_with_timeout(lambda: 1, timeout_seconds=0)
+
+        with pytest.raises(PermissionError, match="file handle"):
+            _resolve_confined_path(123, (tmp_path,))  # type: ignore[arg-type]
+        with pytest.raises(PermissionError, match="Disallowed sandbox path"):
+            _resolve_confined_path("file:///etc/passwd", (tmp_path,))
+        with pytest.raises(PermissionError, match="escapes allowed directories"):
+            _resolve_confined_path("/etc/passwd", (tmp_path,))
+        assert _resolve_confined_path("ok.npy", (tmp_path,)).endswith("ok.npy")
+
+        ns = get_execution_namespace(intent="save", allowed_dirs=(tmp_path,))
+        with pytest.raises(AttributeError, match="read-only"):
+            del ns["np"].load
+        with pytest.raises(AttributeError, match="blocked"):
+            _ = ns["np"].fromfile
+        with pytest.raises(ImportError, match="Relative"):
+            _safe_import("numpy", level=1)
+        assert callable(ns["np"].zeros)
