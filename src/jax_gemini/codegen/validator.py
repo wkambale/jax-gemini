@@ -94,6 +94,7 @@ BANNED_BUILTINS: frozenset[str] = frozenset(
 
 BANNED_NAMES: frozenset[str] = BANNED_BUILTINS | frozenset(
     {
+        "BaseException",
         "__builtins__",
         "__build_class__",
         "__package__",
@@ -316,6 +317,13 @@ class CodeValidator:
                             f"Import of '{imported}' from '{node.module}' is not allowed.",
                             code=code,
                         )
+
+            # Bare except: catches BaseException and could suppress sandbox timeouts
+            if isinstance(node, ast.ExceptHandler) and node.type is None:
+                raise JaxGeminiValidationError(
+                    "Bare 'except:' clauses are not allowed; catch Exception or a specific type.",
+                    code=code,
+                )
 
             # Banned builtin/name references (blocks both direct calls and aliasing)
             if isinstance(node, ast.Name) and node.id in BANNED_NAMES:

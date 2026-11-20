@@ -179,3 +179,15 @@ class TestSandboxExecutor:
         with pytest.raises(JaxGeminiExecutionError, match="escapes allowed directories"):
             self.executor.run(escape_kw_code, "load_data", allowed_dirs=(tmp_path,))
         assert isinstance(safe_import("flax.nnx", None, None, ("Linear",), 0), _SafeModuleProxy)
+
+    def test_except_exception_cannot_swallow_timeout(self):
+        loop_code = (
+            "def build_model(rngs):\n"
+            "    while True:\n"
+            "        try:\n"
+            "            x = 1 + 1\n"
+            "        except Exception:\n"
+            "            pass\n"
+        )
+        with pytest.raises(JaxGeminiExecutionError, match="timed out"):
+            self.executor.run(loop_code, "build", {"rngs": None}, timeout_seconds=0.1)

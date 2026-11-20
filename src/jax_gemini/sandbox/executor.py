@@ -34,6 +34,10 @@ INTENT_DEFAULT_ARGS: dict[str, dict[str, Any]] = {
 }
 
 
+class _SandboxTimeoutError(BaseException):
+    """Unrecoverable timeout raised inside the sandbox so except Exception cannot swallow it."""
+
+
 @contextmanager
 def _execution_timeout(timeout_seconds: float) -> Iterator[None]:
     """Enforce a wall-clock timeout via SIGALRM on the main thread or trace fallback."""
@@ -47,7 +51,7 @@ def _execution_timeout(timeout_seconds: float) -> Iterator[None]:
     )
     if use_sigalrm:
         def _handle_timeout(signum: int, frame: FrameType | None) -> None:
-            raise TimeoutError(f"Execution timed out after {timeout_seconds}s")
+            raise _SandboxTimeoutError(f"Execution timed out after {timeout_seconds}s")
 
         prev_handler = signal.signal(signal.SIGALRM, _handle_timeout)
         prev_timer = signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
@@ -64,7 +68,7 @@ def _execution_timeout(timeout_seconds: float) -> Iterator[None]:
 
         def _trace_deadline(frame: FrameType, event: str, arg: Any) -> Any:
             if time.monotonic() > deadline:
-                raise TimeoutError(f"Execution timed out after {timeout_seconds}s")
+                raise _SandboxTimeoutError(f"Execution timed out after {timeout_seconds}s")
             return _trace_deadline
 
         sys.settrace(_trace_deadline)
@@ -110,7 +114,7 @@ class SandboxExecutor:
         try:
             with _execution_timeout(timeout_seconds):
                 exec(code, namespace)
-        except Exception as e:
+        except (_SandboxTimeoutError, TimeoutError, Exception) as e:
             tb = traceback.format_exc()
             raise JaxGeminiExecutionError(
                 f"Code failed during definition phase: {e}\n\n{tb}",
@@ -129,7 +133,7 @@ class SandboxExecutor:
             with _execution_timeout(timeout_seconds):
                 result = namespace[fn_name](**call_args)
             return result
-        except Exception as e:
+        except (_SandboxTimeoutError, TimeoutError, Exception) as e:
             tb = traceback.format_exc()
             raise JaxGeminiExecutionError(
                 f"Function '{fn_name}' raised an error during execution:\n"

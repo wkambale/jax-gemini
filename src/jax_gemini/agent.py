@@ -169,8 +169,9 @@ class JaxGemini:
         if isinstance(last_error, JaxGeminiValidationError):
             raise last_error
 
+        prompt_preview = user_prompt[:160] + ("..." if len(user_prompt) > 160 else "")
         raise JaxGeminiExecutionError(
-            f"All {self.config.max_retries} attempts failed for '{user_prompt}'.\n"
+            f"All {self.config.max_retries} attempts failed for '{prompt_preview}'.\n"
             f"Last error: {last_error}",
             code=last_code,
             attempts=self.config.max_retries,

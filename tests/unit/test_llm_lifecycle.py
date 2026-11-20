@@ -94,3 +94,35 @@ class TestLLMCredentialLifecycle:
         agent.build("m1")
         call_kwargs = mock_genai.GenerativeModel.return_value.generate_content.call_args.kwargs
         assert call_kwargs["request_options"] == {"timeout": 15}
+
+    @patch("jax_gemini.llm.gemini.genai")
+    def test_env_api_key_not_pinned_and_blocked_response_handled(self, mock_genai, monkeypatch):
+        from jax_gemini.exceptions import JaxGeminiLLMError
+
+        monkeypatch.setenv("GEMINI_API_KEY", "env-key-1")
+        resp1 = MagicMock()
+        resp1.text = json.dumps(
+            {
+                "intent": "build",
+                "code": "import flax.nnx as nnx\ndef build_model(rngs):\n    return 1\n",
+                "description": "ok",
+                "warnings": [],
+            }
+        )
+        blocked_resp = MagicMock()
+        type(blocked_resp).text = property(
+            lambda _self: (_ for _ in ()).throw(ValueError("safety blocked"))
+        )
+        mock_genai.GenerativeModel.return_value.generate_content.side_effect = [
+            resp1,
+            blocked_resp,
+        ]
+
+        agent = jg.JaxGemini(jg.JaxGeminiConfig(max_retries=1))
+        assert agent.build("m1") == 1
+        assert agent.config.gemini_api_key is None
+
+        monkeypatch.setenv("GEMINI_API_KEY", "env-key-2")
+        with pytest.raises(JaxGeminiLLMError, match="no readable text payload"):
+            agent.build("m2")
+        mock_genai.configure.assert_called_with(api_key="env-key-2")

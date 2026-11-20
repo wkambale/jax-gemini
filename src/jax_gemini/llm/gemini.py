@@ -12,6 +12,17 @@ from jax_gemini.llm.base import AbstractLLM
 _GENAI_LOCK = threading.Lock()
 
 
+def _extract_response_text(response: Any) -> str:
+    """Read response.text safely once so blocked/empty candidates fail cleanly."""
+    try:
+        text = response.text
+    except Exception as e:
+        raise JaxGeminiLLMError(f"Gemini returned no readable text payload: {e}") from e
+    if not isinstance(text, str) or not text.strip():
+        raise JaxGeminiLLMError("Gemini returned an empty text payload.")
+    return text
+
+
 class GeminiLLM(AbstractLLM):
     def __init__(self, config: JaxGeminiConfig):
         self._config = config
@@ -29,7 +40,7 @@ class GeminiLLM(AbstractLLM):
         return api_key
 
     def generate(self, messages: list[dict[str, Any]], schema: dict[str, Any]) -> dict[str, Any]:
-        response = None
+        raw_text = ""
         try:
             api_key = self._resolve_api_key()
             with _GENAI_LOCK:
@@ -47,11 +58,12 @@ class GeminiLLM(AbstractLLM):
                     messages,
                     request_options={"timeout": self._config.timeout_seconds},
                 )
-            parsed = json.loads(response.text)
+            raw_text = _extract_response_text(response)
+            parsed = json.loads(raw_text)
             if not isinstance(parsed, dict):
                 raise JaxGeminiLLMError(
                     "Gemini returned a non-object JSON payload.",
-                    raw_response=response.text if hasattr(response, "text") else "",
+                    raw_response=raw_text,
                 )
             return parsed
         except JaxGeminiLLMError:
@@ -59,7 +71,7 @@ class GeminiLLM(AbstractLLM):
         except json.JSONDecodeError as e:
             raise JaxGeminiLLMError(
                 f"Gemini returned invalid JSON: {e}",
-                raw_response=response.text if (response and hasattr(response, "text")) else "",
+                raw_response=raw_text,
             ) from e
         except Exception as e:
             raise JaxGeminiLLMError(f"Gemini API error: {e}") from e
