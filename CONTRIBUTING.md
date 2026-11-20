@@ -1,33 +1,33 @@
 # Contributing guide
 
-Welcome to `jax-gemini`! We are thrilled to invite developers, researchers, and AI pioneers aiming together to streamline seamless AI operational workflows natively executing structural model pipelines.
+Contributions, bug reports, and documentation improvements to `jax-gemini` are welcome.
 
-## How Can I Contribute?
+## Reporting issues
 
-### Reporting Bugs
-Run into arbitrary execution anomalies? Or misinterpretations during AST Parsing pipelines? 
-- Head entirely across our **Issues Tab** capturing your replication paths ensuring verbose tracking outputs tracing back system logic errors helping coordinate triage metrics accurately.
+Open an issue on GitHub with reproduction steps, Python and JAX versions, and the relevant exception output. For AST validation or sandbox issues, include the prompt and intent used.
 
-### Code Adjustments 
-Interested extending logic mapping abstractions? Perfect!
-1. Fork the respective Repository capturing main branches natively.
-2. Draft adjustments inside `fix/` or `feature/` namespace branches explicitly.
-3. Validate internal tests executing `pytest` mapping coverage passing integrations natively.
-4. Open your Pull Request tagging project maintainers linking issue tracking configurations.
+## Pull request workflow
 
-## Development Setup
+1. Branch from `main` using a descriptive branch name such as `fix/validator-edge-case` or `feat/pipeline-helper`.
+2. Add or update unit and integration tests covering your change.
+3. Run linting, strict type checking, and the test suite with coverage before pushing.
+4. Open a pull request against `main` and link the corresponding issue.
 
-We rely on decoupled dependencies structurally packaged standardizing standard operations explicitly orchestrating `hatch` configurations.
+## Local development setup
+
+Create a Python 3.10 to 3.12 virtual environment and install development extras:
+
 ```bash
-# Instantiate environments
 python -m venv venv
-source venv/bin/activate 
-
-# Leverage integrations initializing tool chains
-pip install -e ".[dev]"
-
-# Testing executions validation formats
-pytest tests/
+source venv/bin/activate
+pip install -e ".[dev,viz,docs]"
 ```
 
-Thank you for exploring possibilities driving next-generation AI integrations scaling bounds structurally bridging LLM workflows!
+Run verification checks:
+
+```bash
+ruff check src tests examples
+mypy src
+pytest --cov=jax_gemini tests/
+mkdocs build --strict
+```

@@ -1,26 +1,27 @@
-# Security Protocol & Hardening Procedures
+# Security protocol and hardening procedures
 
-Translating unconstrained natural language into executable Python/JAX code requires layered validation and runtime controls. `jax-gemini` enforces defense-in-depth checks across parsing, AST validation, sandbox execution, checkpoints, and retry prompts.
+Translating unconstrained natural language into executable Python and JAX code requires layered validation and runtime controls. `jax-gemini` enforces defense-in-depth checks across parsing, AST validation, sandbox execution, checkpoints, and retry prompts.
 
-## Validation Tiers
+## Validation tiers
 
-### 1. Code Parsing & Abstract Syntax Tree (AST) Auditor
+### Code parsing and AST auditor
 Before any generated code is executed, `CodeParser` verifies that the LLM response intent matches the requested operation, and `CodeValidator` parses the source into an AST and validates structure and limits:
 
-- **Input & Resource Limits**: Rejects unknown intents (fail-closed) and enforces `MAX_CODE_BYTES`, `MAX_CODE_LINES`, and `MAX_AST_NODES`, while rejecting top-level side effects outside `import` / `def` / `class` / simple constant assignments and blocking relative imports.
-- **Intent-Scoped Import Allowlist**:
+- **Input and resource limits**: Rejects unknown intents (fail-closed) and enforces `MAX_CODE_BYTES`, `MAX_CODE_LINES`, and `MAX_AST_NODES`, while rejecting top-level side effects outside imports, function or class definitions, and call-free constant assignments, and blocking relative and wildcard `*` imports.
+- **Intent-scoped import allowlist**:
   - Core allowed root modules across all intents: `jax`, `flax`, `optax`, `numpy`, `functools`, `typing`, `math`, `dataclasses`.
   - Checkpoint intents (`save`, `load`): additionally allow `orbax`.
   - Plotting intent (`visualize_data`): additionally allow `matplotlib`.
-- **Blocked Names & Attributes**: Rejects dangerous builtins and references (e.g., `eval`, `exec`, `compile`, `input`, `__import__`, `open`, `getattr`, `setattr`, `delattr`, `globals`, `locals`, `vars`, `type`, `object`), unsafe dunder attributes (e.g., `__class__`, `__globals__`, `__subclasses__`, `__bases__`, `gi_frame`, `f_globals`), `allow_pickle=True`, and unsafe NumPy file-reader calls (`fromfile`, `loadtxt`, `genfromtxt`, etc.).
+- **Blocked submodules, names, and attributes**: Rejects dangerous subpackages (`numpy.ctypeslib`, `numpy.f2py`, `numpy.distutils`, `numpy.testing`, `numpy.lib`, `flax.io`, `flax.training.checkpoints`, `orbax.checkpoint.test_utils`), dangerous builtins and names (`eval`, `exec`, `compile`, `input`, `__import__`, `open`, `getattr`, `setattr`, `delattr`, `globals`, `locals`, `vars`, `type`, `BaseException`), bare `except:` handlers, unsafe dunder and reflection attributes (`__class__`, `__globals__`, `__subclasses__`, `__bases__`, `format`, `format_map`, `gi_frame`, `f_globals`), `allow_pickle=True`, and unsafe NumPy file readers (`fromfile`, `memmap`, `DataSource`).
 
-### 2. Runtime Execution Sandbox
+### Runtime execution sandbox
 `SandboxExecutor` enforces `CodeValidator.validate()` even on direct calls and executes validated code inside a fresh isolated namespace (`namespace.py`):
 
-- **Controlled Builtins & Import Guard**: Exposes `SAFE_BUILTINS` (excluding dynamic introspection/code-execution builtins such as `eval`, `exec`, `getattr`, `type`, and `open`) wrapped per execution in a read-only `MappingProxyType` alongside a controlled `_safe_import` enforcing the intent's import allowlist.
-- **Read-Only Module Proxies & Confined File I/O**: Exposes sandbox modules via immutable `_SafeModuleProxy` wrappers so code cannot monkeypatch shared modules; `numpy`, `orbax.checkpoint`, and `matplotlib.pyplot` file APIs validate targets against `allowed_dirs` using symlink-resolving path containment (`_resolve_confined_path`).
-- **Execution Timeouts & Rollback**: Bounds sandbox runtime via `config.timeout_seconds` (POSIX `signal.setitimer` on the main thread and `sys.settrace` deadline checks in worker threads) and snapshots caller `runtime_args` per retry attempt so failed executions do not mutate caller objects or `_current_model`.
-- **Retry Prompt Sanitization & Bounds**: Redacts absolute paths and secrets from execution errors before sending fix prompts, uses dynamic markdown fencing, omits internal allowlist details from retry feedback, and caps prompt and conversation memory sizes.
+- **Controlled builtins and import guard**: Exposes `SAFE_BUILTINS` wrapped per execution alongside a controlled `_safe_import` enforcing the intent's import allowlist, resolving subpackages through root proxies without bypassing wrapper restrictions.
+- **Read-only module proxies and confined file I/O**: Exposes sandbox modules via immutable `_SafeModuleProxy` instances backed by `WeakKeyDictionary` state so code cannot monkeypatch shared modules or read internal handles; `numpy`, `orbax.checkpoint`, and `matplotlib.pyplot` (including `Figure.savefig`) validate positional and keyword path arguments against `allowed_dirs` using symlink-resolving containment (`_resolve_confined_path`).
+- **Execution timeouts and rollback**: Bounds sandbox runtime in a daemon worker thread via `sys.settrace` deadlines and thread join timeouts (`config.timeout_seconds`) using an internal `BaseException` subclass so sandboxed `except Exception:` blocks cannot swallow timeouts; snapshots caller `runtime_args` per retry attempt so failed executions do not mutate caller objects or `_current_model`.
+- **Retry prompt sanitization and bounds**: Redacts absolute paths, API keys, and auth tokens from errors before sending fix prompts, uses dynamic markdown fencing, omits internal allowlist details from retry feedback, and caps prompt and conversation memory sizes.
 
-## Deployment Recommendations
-When embedding `jax-gemini` in multi-tenant or public services, isolate workloads in dedicated OS/container sandboxes (such as Docker/gVisor with seccomp, cgroup CPU/RAM limits, and egress controls) in addition to the in-process AST and namespace protections above.
+## Deployment recommendations
+
+When embedding `jax-gemini` in multi-tenant or public services, isolate workloads in dedicated OS or container sandboxes (such as Docker or gVisor with seccomp, cgroup CPU and RAM limits, and network egress controls) in addition to the in-process AST and namespace protections above.

@@ -115,7 +115,7 @@ class SandboxExecutor:
         if fn_name not in namespace:
             raise JaxGeminiExecutionError(
                 f"Function '{fn_name}' not found in namespace after exec. "
-                "This is a validator bug — please report it.",
+                "This is a validator bug; please report it.",
                 code=code,
             )
 

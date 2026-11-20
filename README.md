@@ -1,82 +1,84 @@
-<div align="center">
-  <h1>Jax-Gemini</h1>
-  <p><b>Natural language-driven JAX/Flax model building powered by Google Gemini.</b></p>
-  
-  [![PyPI version](https://img.shields.io/pypi/v/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.2/)
-  [![Python Versions](https://img.shields.io/pypi/pyversions/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.2/)
-  [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-</div>
+# jax-gemini
 
-<br/>
+Natural language-driven JAX and Flax model building powered by Google Gemini.
 
-`jax-gemini` is a Python library that allows AI/ML practitioners, researchers, and domain experts to build, train, evaluate, and snapshot JAX/Flax neural network models using conversational plain English prompts without writing JAX boilerplate code.
+Package version: `0.1.3` ([PyPI](https://pypi.org/project/jax-gemini/0.1.3/)) | Supported Python: 3.10 to 3.12 | License: [MIT](LICENSE)
 
-Unlike traditional descriptive LLM wrappers, **jax-gemini returns real, executable Python/JAX `flax.nnx.Module` objects**. Your prompts dictate instructions; Gemini generates the respective code; jax-gemini runs it securely inside a sandboxed namespace and hands the resulting object back to you.
+`jax-gemini` enables machine learning engineers and researchers to build, train, evaluate, and persist JAX and Flax neural networks from plain English prompts without writing repetitive boilerplate.
 
-## Features
+Unlike text-only LLM wrappers, `jax-gemini` executes validated generated code inside an isolated sandbox and returns live `flax.nnx.Module` instances, trained weights, evaluation dictionaries, and confined checkpoints.
 
-- **Real Objects, Not Text**: Every operation yields a genuine Python object (e.g. `flax.nnx.Module`), trained weights, or dictionaries natively integrated with JAX environments.
-- **Conversational Memory**: Retains the context of modifications multi-turn iteratively. Add dropout layers, reshape variables or tweak hyper-parameters step-by-step.
-- **Safe Execution by Default**: All parsed LLM code generation is restricted through an AST Abstract Syntax Tree Validator restricting arbitrary script execution and imports. 
-- **Auto-Healing**: Encountering exceptions? jax-gemini features an adaptive auto-correction mechanism which relays failed code and Python tracebacks directly back to Gemini for automatic pipeline repair.
+## Core features
+
+- **Executable JAX objects**: Returns instantiated `flax.nnx.Module` models, trained Optax states, and structured metrics dictionaries.
+- **Bounded conversational memory**: Retains multi-turn refinement context and the active model state so follow-up calls such as `jg.modify()` and `jg.train()` build upon prior steps cleanly.
+- **Layered sandbox validation**: Enforces AST size and node budgets, intent-scoped import allowlists, read-only module proxies, confined filesystem I/O, and execution timeouts.
+- **Self-healing retry loop**: Sanitizes tracebacks and redacts paths and credentials before returning failure context to Gemini for correction, with per-attempt `runtime_args` rollback.
+- **Pipeline and Flax/Optax utilities**: Includes composable pipeline wrappers in `jax_gemini.pipeline` and inspection helpers in `jax_gemini.contrib`.
 
 ## Quickstart
 
 ### Installation
 
-Install via [PyPI](https://pypi.org/project/jax-gemini/0.1.2/):
+Install the core package from [PyPI](https://pypi.org/project/jax-gemini/0.1.3/):
+
 ```bash
 pip install jax-gemini
-# Optional plotting support for jg.visualize_data():
+```
+
+Install optional plotting support for `jg.visualize_data()`:
+
+```bash
 pip install "jax-gemini[viz]"
 ```
 
-Setup your [Gemini API Key](https://aistudio.google.com/):
+Export your [Gemini API key](https://aistudio.google.com/):
+
 ```bash
 export GEMINI_API_KEY="your-api-key-here"
 ```
 
-### Conversational Model Building
+### Conversational model workflow
 
 ```python
 import jax_gemini as jg
 import numpy as np
 
-# Note: jg automatically picks up GEMINI_API_KEY from env
+# Configuration reads GEMINI_API_KEY from the environment when left unset
 jg.config.set({"model_name": "gemini-3.1-pro"})
 
-# Build a model exclusively purely from text
+# Build a model from natural language
 model = jg.build("Build a 4-layer MLP for handwritten digit classification")
 
-# Refine the architecture interactively
-model = jg.modify("Ah, wait, add dropout with rate 0.2 between each layer for regularization")
+# Refine the architecture across turns
+model = jg.modify("Add dropout with rate 0.2 between each hidden layer")
 
-# Train your model
+# Train the active model
 X_train = np.random.randn(100, 28, 28, 1).astype(np.float32)
 y_train = np.random.randint(0, 10, size=(100,))
 
 model, metrics = jg.train(
-    "Train for 10 epochs with Adam optimizer and Cross Entropy Loss",
-    dataset=(X_train, y_train)
+    "Train for 10 epochs with Adam and cross-entropy loss",
+    dataset=(X_train, y_train),
 )
 print(f"Accuracy: {metrics['accuracy']:.2%}")
 
-# Checkpoint Persistence
+# Persist checkpoints inside config.checkpoint_dir
 checkpoint_path = jg.save("digit_classifier_v1")
 
-# Automatic Intent Routing
-model = jg.run("Evaluate accuracy on the test set", dataset=(X_test, y_test))
+# Dispatch by intent automatically
+eval_metrics = jg.run("Evaluate accuracy on the test set", dataset=(X_train, y_train))
 ```
 
-See [examples/](examples/) for more comprehensive workflows such as Jupyter Notebook deployments end-to-end setups.
+See [examples/](examples/) for end-to-end Python scripts and Jupyter notebooks.
 
 ## Documentation
-- [Quickstart Guide](docs/quickstart.md): Extensive introduction and core philosophies.
-- [API Reference](docs/api-reference.md): Detailed API coverage and methods parameters.
-- [Architecture Insights](docs/architecture.md): Design elements under the hood. 
-- [Security Protocol](docs/security.md): Code validation and restricted runtime policies.
 
-## License and Contributing
-This repository thrives on community input. Check out our [Contribution Guidelines](CONTRIBUTING.md) to log issues or prepare Pull Requests.
+- [Quickstart guide](docs/quickstart.md): Installation, session lifecycle, training, and checkpointing.
+- [API reference](docs/api-reference.md): Public functions, configuration fields, pipeline stages, and contrib helpers.
+- [Architecture internals](docs/architecture.md): Module boundaries across generation, validation, sandbox execution, and memory.
+- [Security protocol](docs/security.md): AST rules, import scoping, runtime proxies, path confinement, and timeout enforcement.
 
-Distributed under the **MIT License**. See `LICENSE` for more information.
+## License and contributing
+
+Read the [contribution guidelines](CONTRIBUTING.md) before opening issues or pull requests. Distributed under the MIT License; see [LICENSE](LICENSE) for full terms.

@@ -1,0 +1,43 @@
+site_name: jax-gemini
+site_description: Natural language-driven JAX and Flax model building powered by Gemini
+site_url: https://wkambale.github.io/jax-gemini
+repo_url: https://github.com/wkambale/jax-gemini
+repo_name: wkambale/jax-gemini
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.top
+    - navigation.sections
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Quickstart guide: quickstart.md
+  - API reference: api-reference.md
+  - Architecture internals: architecture.md
+  - Security protocol: security.md

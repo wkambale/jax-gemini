@@ -17,6 +17,7 @@ dist/
 build/
 *.egg-info/
 .hatch/
+site/
 .DS_Store
 # Application output
 jax_gemini_checkpoints/
