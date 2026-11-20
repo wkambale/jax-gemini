@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -32,7 +33,7 @@ class ConversationMemory:
     def get_current_model_state(self) -> ModelState | None:
         return self._model_history[-1] if self._model_history else None
 
-    def to_gemini_messages(self) -> list[dict]:
+    def to_gemini_messages(self) -> list[dict[str, Any]]:
         """Convert to the format expected by google-generativeai."""
         return [{"role": turn.role, "parts": [turn.content]} for turn in self._turns]
 

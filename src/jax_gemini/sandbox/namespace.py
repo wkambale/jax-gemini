@@ -20,6 +20,7 @@ except ImportError:
     _matplotlib_available = False
 
 import builtins
+from typing import Any
 
 SAFE_BUILTINS = {
     name: getattr(builtins, name, None)
@@ -64,7 +65,7 @@ SAFE_BUILTINS = {
     if getattr(builtins, name, None) is not None
 }
 
-BASE_NAMESPACE: dict = {
+BASE_NAMESPACE: dict[str, Any] = {
     "jax": jax,
     "jnp": jnp,
     "flax": flax,
@@ -75,7 +76,7 @@ BASE_NAMESPACE: dict = {
 }
 
 if _orbax_available:
-    import orbax.checkpoint as ocp  # type: ignore
+    import orbax.checkpoint as ocp
 
     BASE_NAMESPACE["ocp"] = ocp
     BASE_NAMESPACE["orbax"] = __import__("orbax")
@@ -85,6 +86,6 @@ if _matplotlib_available:
     BASE_NAMESPACE["matplotlib"] = __import__("matplotlib")
 
 
-def get_execution_namespace() -> dict:
+def get_execution_namespace() -> dict[str, Any]:
     """Return a fresh copy of the safe namespace for each execution."""
     return dict(BASE_NAMESPACE)

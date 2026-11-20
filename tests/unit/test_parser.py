@@ -18,3 +18,8 @@ class TestParser:
         response = {"code": "   ", "intent": "build"}
         with pytest.raises(JaxGeminiLLMError, match="empty code block"):
             CodeParser.extract(response, "build")
+
+    def test_non_string_code_raises(self):
+        response = {"code": 123, "intent": "build"}
+        with pytest.raises(JaxGeminiLLMError, match="must be a string"):
+            CodeParser.extract(response, "build")

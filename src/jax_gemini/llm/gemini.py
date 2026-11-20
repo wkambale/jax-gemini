@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Any
 
 import google.generativeai as genai
 
@@ -16,15 +17,15 @@ class GeminiLLM(AbstractLLM):
                 "No Gemini API key found. Set gemini_api_key in config "
                 "or export GEMINI_API_KEY as an environment variable."
             )
-        genai.configure(api_key=api_key)
+        genai.configure(api_key=api_key)  # type: ignore[attr-defined]
         self._config = config
 
-    def generate(self, messages: list[dict], schema: dict) -> dict:
+    def generate(self, messages: list[dict[str, Any]], schema: dict[str, Any]) -> dict[str, Any]:
         response = None
         try:
-            model = genai.GenerativeModel(
+            model = genai.GenerativeModel(  # type: ignore[attr-defined]
                 model_name=self._config.model_name,
-                generation_config=genai.GenerationConfig(
+                generation_config=genai.GenerationConfig(  # type: ignore[attr-defined]
                     response_mime_type="application/json",
                     response_schema=schema,
                     temperature=self._config.temperature,
@@ -32,7 +33,15 @@ class GeminiLLM(AbstractLLM):
                 ),
             )
             response = model.generate_content(messages)
-            return json.loads(response.text)
+            parsed = json.loads(response.text)
+            if not isinstance(parsed, dict):
+                raise JaxGeminiLLMError(
+                    "Gemini returned a non-object JSON payload.",
+                    raw_response=response.text if hasattr(response, "text") else "",
+                )
+            return parsed
+        except JaxGeminiLLMError:
+            raise
         except json.JSONDecodeError as e:
             raise JaxGeminiLLMError(
                 f"Gemini returned invalid JSON: {e}",
@@ -43,7 +52,7 @@ class GeminiLLM(AbstractLLM):
 
     def is_available(self) -> bool:
         try:
-            model = genai.GenerativeModel(self._config.model_name)
+            model = genai.GenerativeModel(self._config.model_name)  # type: ignore[attr-defined]
             model.generate_content("ping")
             return True
         except Exception:

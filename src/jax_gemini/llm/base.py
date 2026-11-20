@@ -4,7 +4,7 @@ from typing import Any
 
 class AbstractLLM(ABC):
     @abstractmethod
-    def generate(self, messages: list[dict[str, Any]], schema: dict) -> dict:
+    def generate(self, messages: list[dict[str, Any]], schema: dict[str, Any]) -> dict[str, Any]:
         """
         Send messages to the LLM and return a parsed JSON response.
 
