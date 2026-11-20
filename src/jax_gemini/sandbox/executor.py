@@ -1,6 +1,7 @@
 import traceback
 from typing import Any
 
+from jax_gemini.codegen.validator import CodeValidator
 from jax_gemini.exceptions import JaxGeminiExecutionError
 from jax_gemini.sandbox.namespace import get_execution_namespace
 
@@ -44,8 +45,10 @@ class SandboxExecutor:
             Whatever the generated function returns
 
         Raises:
+            JaxGeminiValidationError: If code fails AST validation
             JaxGeminiExecutionError: If execution fails
         """
+        CodeValidator.validate(code, intent)
         namespace = get_execution_namespace()
         fn_name = INTENT_FUNCTION_MAP.get(intent, "")
         if not fn_name:
