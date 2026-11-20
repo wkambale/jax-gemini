@@ -1,8 +1,14 @@
-# jax-gemini
+<div align="center">
+  <h1>Jax Gemini</h1>
+  <p><b>Natural language-driven JAX and Flax model building powered by Google Gemini</b></p>
 
-Natural language-driven JAX and Flax model building powered by Google Gemini.
+  [![PyPI version](https://img.shields.io/pypi/v/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.3/)
+  [![Python Versions](https://img.shields.io/pypi/pyversions/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.3/)
+  [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+  [![CI](https://github.com/wkambale/jax-gemini/actions/workflows/ci.yml/badge.svg)](https://github.com/wkambale/jax-gemini/actions/workflows/ci.yml)
+</div>
 
-Package version: `0.1.3` ([PyPI](https://pypi.org/project/jax-gemini/0.1.3/)) | Supported Python: 3.10 to 3.12 | License: [MIT](LICENSE)
+Package version: `0.1.3` ([PyPI](https://pypi.org/project/jax-gemini/0.1.3/)) | Supported Python: 3.10 to 3.12 | [Documentation site](https://wkambale.github.io/jax-gemini) | License: [MIT](LICENSE)
 
 `jax-gemini` enables machine learning engineers and researchers to build, train, evaluate, and persist JAX and Flax neural networks from plain English prompts without writing repetitive boilerplate.
 
