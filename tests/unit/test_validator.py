@@ -58,3 +58,111 @@ class TestCodeValidator:
         code = "from pathlib import Path\ndef build_model(rngs): pass"
         with pytest.raises(JaxGeminiValidationError, match="pathlib"):
             CodeValidator.validate(code, "build")
+
+    def test_relative_import_raises(self):
+        code = "from . import secret\ndef build_model(rngs): pass"
+        with pytest.raises(JaxGeminiValidationError, match="Relative imports"):
+            CodeValidator.validate(code, "build")
+
+    def test_aliased_banned_builtin_raises(self):
+        code = "def build_model(rngs):\n    imp = __import__\n    return imp('os')"
+        with pytest.raises(JaxGeminiValidationError, match="__import__"):
+            CodeValidator.validate(code, "build")
+
+    def test_builtins_name_access_raises(self):
+        code = "def build_model(rngs):\n    return __builtins__['eval']"
+        with pytest.raises(JaxGeminiValidationError, match="__builtins__"):
+            CodeValidator.validate(code, "build")
+
+    def test_getattr_name_raises(self):
+        code = "def build_model(rngs):\n    return getattr(rngs, '__class__')"
+        with pytest.raises(JaxGeminiValidationError, match="getattr"):
+            CodeValidator.validate(code, "build")
+
+    def test_traceback_frame_attribute_raises(self):
+        code = (
+            "def build_model(rngs):\n"
+            "    try:\n"
+            "        1 / 0\n"
+            "    except Exception as e:\n"
+            "        return e.__traceback__.tb_frame.f_back\n"
+        )
+        with pytest.raises(JaxGeminiValidationError, match="not allowed"):
+            CodeValidator.validate(code, "build")
+
+    def test_unknown_intent_fails_closed(self):
+        code = "def build_model(rngs): pass"
+        with pytest.raises(JaxGeminiValidationError, match="Unknown intent"):
+            CodeValidator.validate(code, "unknown_intent")
+
+    def test_top_level_side_effect_raises(self):
+        code = "print('side effect')\ndef build_model(rngs): pass"
+        with pytest.raises(JaxGeminiValidationError, match="Top-level statement"):
+            CodeValidator.validate(code, "build")
+
+    def test_oversized_single_line_code_raises(self):
+        code = "def build_model(rngs):\n    x = '" + ("a" * 20001) + "'"
+        with pytest.raises(JaxGeminiValidationError, match="maximum byte length"):
+            CodeValidator.validate(code, "build")
+
+    def test_class_definition_with_init_and_call_passes(self):
+        code = (
+            "import flax.nnx as nnx\n"
+            "class MLP(nnx.Module):\n"
+            "    def __init__(self, rngs):\n"
+            "        self.linear = nnx.Linear(4, 2, rngs=rngs)\n"
+            "    def __call__(self, x):\n"
+            "        return self.linear(x)\n"
+            "def build_model(rngs):\n"
+            "    return MLP(rngs)\n"
+        )
+        CodeValidator.validate(code, "build")
+
+    def test_allow_pickle_true_raises(self):
+        code = (
+            "import numpy as np\n"
+            "def load_data():\n"
+            "    return np.load('x.npy', allow_pickle=True)\n"
+        )
+        with pytest.raises(JaxGeminiValidationError, match="allow_pickle"):
+            CodeValidator.validate(code, "load_data")
+
+    def test_orbax_blocked_for_non_checkpoint_intent(self):
+        code = "import orbax.checkpoint as ocp\ndef build_model(rngs): pass"
+        with pytest.raises(JaxGeminiValidationError, match="orbax"):
+            CodeValidator.validate(code, "build")
+
+    def test_numpy_fromfile_blocked(self):
+        code = "import numpy as np\ndef load_data():\n    return np.fromfile('/etc/passwd')\n"
+        with pytest.raises(JaxGeminiValidationError, match="fromfile"):
+            CodeValidator.validate(code, "load_data")
+
+    def test_submodule_import_from_and_wildcard_blocked(self):
+        for bad in (
+            "from numpy.ctypeslib import load_library\ndef load_data():\n    return None\n",
+            "from numpy.lib.npyio import load\ndef load_data():\n    return None\n",
+            "from flax.training.checkpoints import save_checkpoint\n"
+            "def build_model(rngs):\n    return None\n",
+            "from numpy import *\ndef load_data():\n    return None\n",
+            "from numpy import fromfile\ndef load_data():\n    return None\n",
+        ):
+            with pytest.raises(JaxGeminiValidationError):
+                CodeValidator.validate(bad, "load_data" if "load_data" in bad else "build")
+
+    def test_format_string_traversal_and_proxy_internals_blocked(self):
+        for bad in (
+            "import flax.nnx as nnx\n"
+            "def build_model(rngs):\n    return '{0.__globals__}'.format(nnx.Linear)\n",
+            "import numpy as np\ndef load_data():\n    return np._target.fromfile('/etc/passwd')\n",
+        ):
+            with pytest.raises(JaxGeminiValidationError):
+                CodeValidator.validate(bad, "load_data" if "load_data" in bad else "build")
+
+    def test_bare_except_and_baseexception_blocked(self):
+        for bad in (
+            "def build_model(rngs):\n    try:\n        return 1\n    except:\n        return 2\n",
+            "def build_model(rngs):\n"
+            "    try:\n        return 1\n    except BaseException:\n        return 2\n",
+        ):
+            with pytest.raises(JaxGeminiValidationError):
+                CodeValidator.validate(bad, "build")

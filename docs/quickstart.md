@@ -3,7 +3,7 @@
 This guide introduces you to the core workflows for using `jax-gemini`.
 
 ## Prerequisites
-Ensure that you have installed the package via [PyPI (`jax-gemini`)](https://pypi.org/project/jax-gemini/0.1.1/) either in your virtual environment or Jupyter notebook.
+Ensure that you have installed the package via [PyPI (`jax-gemini`)](https://pypi.org/project/jax-gemini/0.1.2/) either in your virtual environment or Jupyter notebook (`pip install jax-gemini`, or `pip install "jax-gemini[viz]"` for plotting support).
 Before digging deeply into the logic, ensure that you have initialized the system credentials. 
 Obtain a valid **Google Gemini API Key** and set it safely inside operations:
 ```python

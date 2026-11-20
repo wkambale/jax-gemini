@@ -1,3 +1,6 @@
+import pytest
+
+from jax_gemini.exceptions import JaxGeminiIntentError
 from jax_gemini.prompts.intent import IntentClassifier
 
 
@@ -27,3 +30,13 @@ class TestIntentClassifier:
         assert IntentClassifier.classify("analyze data to find mean") == "analyze_data"
         assert IntentClassifier.classify("plot the training curve") == "visualize_data"
         assert IntentClassifier.classify("visualize the dataset distribution") == "visualize_data"
+
+    def test_avoids_substring_collisions_and_rejects_unknown(self):
+        # 'overfitting' contains 'fit', 'latest' contains 'test', 'state' contains 'stat'
+        assert IntentClassifier.classify("train model to prevent overfitting") == "train"
+        assert IntentClassifier.classify("evaluate latest model state") == "evaluate"
+
+        with pytest.raises(JaxGeminiIntentError):
+            IntentClassifier.classify("")
+        with pytest.raises(JaxGeminiIntentError):
+            IntentClassifier.classify("hello there")

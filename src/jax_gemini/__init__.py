@@ -43,13 +43,15 @@ __all__ = [
     "modify",
     "preprocess_data",
     "reset",
+    "run",
     "save",
     "show_code",
     "train",
     "visualize_data",
 ]
 
-# Module-level singleton for simple usage pattern (jg.build, jg.train, etc.)
+# Module-level singleton for single-session interactive usage (jg.build, jg.train, etc.).
+# Multi-user or concurrent callers must instantiate separate JaxGemini() instances.
 _default_agent = JaxGemini()
 config = _default_agent.config
 build = _default_agent.build
@@ -65,3 +67,4 @@ load_data = _default_agent.load_data
 preprocess_data = _default_agent.preprocess_data
 analyze_data = _default_agent.analyze_data
 visualize_data = _default_agent.visualize_data
+run = _default_agent.run
