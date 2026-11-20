@@ -1,5 +1,5 @@
 import os
-from typing import Any
+from typing import Any, cast
 
 import flax.nnx as nnx
 
@@ -21,7 +21,7 @@ class JaxGemini:
         self._memory = ConversationMemory()
         self._executor = SandboxExecutor()
         self._last_code: str | None = None
-        self._last_response: dict | None = None
+        self._last_response: dict[str, Any] | None = None
         self._current_model: Any = None
 
     def _get_llm(self) -> GeminiLLM:
@@ -38,7 +38,7 @@ class JaxGemini:
         self,
         user_prompt: str,
         intent: str,
-        runtime_args: dict | None = None,
+        runtime_args: dict[str, Any] | None = None,
     ) -> Any:
         llm = self._get_llm()
         context = ContextBuilder.build(
@@ -118,31 +118,40 @@ class JaxGemini:
         self._current_model = model
         return model
 
-    def train(self, prompt: str, dataset: tuple | None = None) -> tuple[Any, dict]:
+    def train(
+        self, prompt: str, dataset: tuple[Any, ...] | None = None
+    ) -> tuple[Any, dict[str, Any]]:
         """Train the current model. Returns (model, metrics_dict)."""
-        args = {"dataset": dataset} if dataset else {}
+        args: dict[str, Any] = {"dataset": dataset} if dataset else {}
         if self._current_model is not None:
             args["model"] = self._current_model
         result = self._generate_and_execute(prompt, intent="train", runtime_args=args)
         if isinstance(result, tuple):
             self._current_model = result[0]
-            return result
+            return cast("tuple[Any, dict[str, Any]]", result)
         return result, {}
 
-    def evaluate(self, prompt: str, dataset: tuple | None = None) -> dict:
+    def evaluate(
+        self, prompt: str, dataset: tuple[Any, ...] | None = None
+    ) -> dict[str, Any]:
         """Evaluate the current model. Returns a metrics dict."""
-        args = {"dataset": dataset} if dataset else {}
+        args: dict[str, Any] = {"dataset": dataset} if dataset else {}
         if self._current_model is not None:
             args["model"] = self._current_model
-        return self._generate_and_execute(prompt, intent="evaluate", runtime_args=args)
+        return cast(
+            "dict[str, Any]",
+            self._generate_and_execute(prompt, intent="evaluate", runtime_args=args),
+        )
 
     def save(self, name: str) -> str:
         """Save the current model checkpoint. Returns the checkpoint path."""
         path = os.path.join(self.config.checkpoint_dir, name)
-        return self._generate_and_execute(
-            f"Save the model to {path}",
-            intent="save",
-            runtime_args={"model": self._current_model, "path": path},
+        return str(
+            self._generate_and_execute(
+                f"Save the model to {path}",
+                intent="save",
+                runtime_args={"model": self._current_model, "path": path},
+            )
         )
 
     def load(self, name: str) -> Any:
@@ -181,7 +190,7 @@ class JaxGemini:
         if not self._last_code:
             return "No code has been generated yet. Call jg.build() first."
         if self._last_response and "description" in self._last_response:
-            return self._last_response["description"]
+            return str(self._last_response["description"])
         return "No explanation available for the last operation."
 
     def show_code(self) -> str:

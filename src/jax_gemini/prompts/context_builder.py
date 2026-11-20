@@ -1,3 +1,5 @@
+from typing import Any
+
 from jax_gemini.memory.conversation import ConversationMemory, ModelState
 from jax_gemini.prompts import system_prompt
 
@@ -9,7 +11,7 @@ class ContextBuilder:
         user_prompt: str,
         memory: ConversationMemory,
         current_model_state: ModelState | None,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Assemble the full message list sent to Gemini."""
         # 1. Select the relevant system prompt
         if intent == "build":
@@ -33,7 +35,7 @@ class ContextBuilder:
         else:
             sys_prompt = system_prompt.BUILD_SYSTEM_PROMPT
 
-        messages = []
+        messages: list[dict[str, Any]] = []
 
         # System prompt as first user turn, followed by an ack from the model, per guidelines
         messages.append({"role": "user", "parts": [sys_prompt]})
@@ -51,7 +53,7 @@ class ContextBuilder:
         return messages
 
     @staticmethod
-    def get_schema(intent: str) -> dict:
+    def get_schema(intent: str) -> dict[str, Any]:
         """Get the expected JSON schema for the given intent."""
         # A simple permissive schema that expects at least 'intent', 'code', 'description'
         return {
