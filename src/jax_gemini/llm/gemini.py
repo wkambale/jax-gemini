@@ -43,7 +43,10 @@ class GeminiLLM(AbstractLLM):
                         max_output_tokens=self._config.max_output_tokens,
                     ),
                 )
-                response = model.generate_content(messages)
+                response = model.generate_content(
+                    messages,
+                    request_options={"timeout": self._config.timeout_seconds},
+                )
             parsed = json.loads(response.text)
             if not isinstance(parsed, dict):
                 raise JaxGeminiLLMError(
@@ -67,7 +70,10 @@ class GeminiLLM(AbstractLLM):
             with _GENAI_LOCK:
                 genai.configure(api_key=api_key)  # type: ignore[attr-defined]
                 model = genai.GenerativeModel(self._config.model_name)  # type: ignore[attr-defined]
-                model.generate_content("ping")
+                model.generate_content(
+                    "ping",
+                    request_options={"timeout": self._config.timeout_seconds},
+                )
             return True
         except Exception:
             return False
