@@ -1,9 +1,9 @@
 import flax.nnx as nnx
 import pytest
 
-from jax_gemini.exceptions import JaxGeminiExecutionError, JaxGeminiValidationError
-from jax_gemini.sandbox.executor import SandboxExecutor
-from jax_gemini.sandbox.namespace import SAFE_BUILTINS
+from jaxforge.exceptions import JaxForgeExecutionError, JaxForgeValidationError
+from jaxforge.sandbox.executor import SandboxExecutor
+from jaxforge.sandbox.namespace import SAFE_BUILTINS
 
 
 class TestSandboxExecutor:
@@ -21,7 +21,7 @@ class TestSandboxExecutor:
 
     def test_runtime_error_raises_execution_error(self):
         code = "def build_model(rngs):\n    raise ValueError('test error')\n"
-        with pytest.raises(JaxGeminiExecutionError, match="test error"):
+        with pytest.raises(JaxForgeExecutionError, match="test error"):
             self.executor.run(code, "build", {"rngs": None})
 
     def test_namespace_is_isolated(self):
@@ -29,12 +29,12 @@ class TestSandboxExecutor:
         code1 = "SECRET = 'top_secret'\ndef build_model(rngs): return 42\n"
         self.executor.run(code1, "build", {"rngs": None})
         code2 = "def build_model(rngs): return SECRET\n"
-        with pytest.raises(JaxGeminiExecutionError):
+        with pytest.raises(JaxForgeExecutionError):
             self.executor.run(code2, "build", {"rngs": None})
 
     def test_executor_enforces_validator_directly(self):
         code = "import os\ndef build_model(rngs): return os.getcwd()\n"
-        with pytest.raises(JaxGeminiValidationError, match="os"):
+        with pytest.raises(JaxForgeValidationError, match="os"):
             self.executor.run(code, "build", {"rngs": None})
 
     def test_safe_builtins_excludes_getattr_type_and_blocks_os_import(self):
@@ -76,7 +76,7 @@ class TestSandboxExecutor:
             "def load_data():\n"
             f"    return np.load('{outside}')\n"
         )
-        with pytest.raises(JaxGeminiExecutionError, match="escapes allowed directories"):
+        with pytest.raises(JaxForgeExecutionError, match="escapes allowed directories"):
             self.executor.run(traversal_code, "load_data", allowed_dirs=(sandbox_dir,))
 
         pickle_kw_code = (
@@ -85,7 +85,7 @@ class TestSandboxExecutor:
             "    flag = True\n"
             "    return np.load('ok.npy', allow_pickle=flag)\n"
         )
-        with pytest.raises(JaxGeminiValidationError, match="allow_pickle"):
+        with pytest.raises(JaxForgeValidationError, match="allow_pickle"):
             self.executor.run(pickle_kw_code, "load_data", allowed_dirs=(sandbox_dir,))
 
         pickle_pos_code = (
@@ -93,11 +93,11 @@ class TestSandboxExecutor:
             "def load_data():\n"
             "    return np.load('ok.npy', None, True)\n"
         )
-        with pytest.raises(JaxGeminiExecutionError, match="Pickle deserialization"):
+        with pytest.raises(JaxForgeExecutionError, match="Pickle deserialization"):
             self.executor.run(pickle_pos_code, "load_data", allowed_dirs=(sandbox_dir,))
 
     def test_module_proxies_are_read_only_and_builtins_isolated(self):
-        from jax_gemini.sandbox.namespace import get_execution_namespace
+        from jaxforge.sandbox.namespace import get_execution_namespace
 
         poison_code = (
             "import flax.nnx as nnx\n"
@@ -105,7 +105,7 @@ class TestSandboxExecutor:
             "    nnx.POISON = 'bad'\n"
             "    return 1\n"
         )
-        with pytest.raises(JaxGeminiExecutionError, match="read-only"):
+        with pytest.raises(JaxForgeExecutionError, match="read-only"):
             self.executor.run(poison_code, "build", {"rngs": None})
 
         ns1 = get_execution_namespace()
@@ -123,7 +123,7 @@ class TestSandboxExecutor:
             "    while True:\n"
             "        pass\n"
         )
-        with pytest.raises(JaxGeminiExecutionError, match="timed out"):
+        with pytest.raises(JaxForgeExecutionError, match="timed out"):
             self.executor.run(loop_code, "build", {"rngs": None}, timeout_seconds=0.1)
 
     def test_infinite_loop_times_out_in_worker_thread(self):
@@ -138,11 +138,11 @@ class TestSandboxExecutor:
             fut = pool.submit(
                 self.executor.run, loop_code, "build", {"rngs": None}, None, 0.1
             )
-            with pytest.raises(JaxGeminiExecutionError, match="timed out"):
+            with pytest.raises(JaxForgeExecutionError, match="timed out"):
                 fut.result(timeout=5.0)
 
     def test_safe_import_and_keyword_path_confinement(self, tmp_path):
-        from jax_gemini.sandbox.namespace import _SafeModuleProxy, get_execution_namespace
+        from jaxforge.sandbox.namespace import _SafeModuleProxy, get_execution_namespace
 
         ns = get_execution_namespace(intent="load_data", allowed_dirs=(tmp_path,))
         safe_import = ns["__builtins__"]["__import__"]
@@ -176,7 +176,7 @@ class TestSandboxExecutor:
             "def load_data():\n"
             "    np.savetxt(fname='/tmp/escape.txt', X=np.array([1.0]))\n"
         )
-        with pytest.raises(JaxGeminiExecutionError, match="escapes allowed directories"):
+        with pytest.raises(JaxForgeExecutionError, match="escapes allowed directories"):
             self.executor.run(escape_kw_code, "load_data", allowed_dirs=(tmp_path,))
         assert isinstance(safe_import("flax.nnx", None, None, ("Linear",), 0), _SafeModuleProxy)
 
@@ -189,12 +189,12 @@ class TestSandboxExecutor:
             "        except Exception:\n"
             "            pass\n"
         )
-        with pytest.raises(JaxGeminiExecutionError, match="timed out"):
+        with pytest.raises(JaxForgeExecutionError, match="timed out"):
             self.executor.run(loop_code, "build", {"rngs": None}, timeout_seconds=0.1)
 
     def test_timeout_and_namespace_direct_guards(self, tmp_path):
-        from jax_gemini.sandbox.executor import _run_with_timeout
-        from jax_gemini.sandbox.namespace import (
+        from jaxforge.sandbox.executor import _run_with_timeout
+        from jaxforge.sandbox.namespace import (
             _resolve_confined_path,
             _safe_import,
             get_execution_namespace,

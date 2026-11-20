@@ -1,9 +1,9 @@
 import pytest
 
-from jax_gemini import JaxGemini, JaxGeminiConfig
-from jax_gemini.exceptions import JaxGeminiValidationError
-from jax_gemini.memory.conversation import ConversationMemory, ModelState
-from jax_gemini.prompts.context_builder import MAX_PROMPT_CHARS, ContextBuilder
+from jaxforge import JaxForge, JaxForgeConfig
+from jaxforge.exceptions import JaxForgeValidationError
+from jaxforge.memory.conversation import ConversationMemory, ModelState
+from jaxforge.prompts.context_builder import MAX_PROMPT_CHARS, ContextBuilder
 
 
 class TestContextBuilder:
@@ -31,13 +31,13 @@ class TestContextBuilder:
 
     def test_oversized_or_empty_prompt_rejected(self):
         memory = ConversationMemory()
-        with pytest.raises(JaxGeminiValidationError):
+        with pytest.raises(JaxForgeValidationError):
             ContextBuilder.build("build", "x" * (MAX_PROMPT_CHARS + 1), memory, None)
-        with pytest.raises(JaxGeminiValidationError):
+        with pytest.raises(JaxForgeValidationError):
             ContextBuilder.build("build", "   ", memory, None)
 
     def test_agent_rejects_oversized_prompt_before_llm_init(self):
         # No API key needed: must fail fast on prompt validation before _get_llm()
-        agent = JaxGemini(config=JaxGeminiConfig())
-        with pytest.raises(JaxGeminiValidationError, match="exceeds maximum allowed"):
+        agent = JaxForge(config=JaxForgeConfig())
+        with pytest.raises(JaxForgeValidationError, match="exceeds maximum allowed"):
             agent.build("a" * (MAX_PROMPT_CHARS + 10))

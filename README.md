@@ -1,88 +1,100 @@
 <div align="center">
-  <h1>Jax Gemini</h1>
-  <p><b>Natural language-driven JAX and Flax model building powered by Google Gemini</b></p>
+  <h1>Jax Forge</h1>
+  <p><b>Model-agnostic natural language engineering workbench for JAX and Flax</b></p>
 
-  [![PyPI version](https://img.shields.io/pypi/v/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.3/)
-  [![Python Versions](https://img.shields.io/pypi/pyversions/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.3/)
+  [![PyPI version](https://img.shields.io/pypi/v/jaxforge.svg)](https://pypi.org/project/jaxforge/0.2.0/)
+  [![Python Versions](https://img.shields.io/pypi/pyversions/jaxforge.svg)](https://pypi.org/project/jaxforge/0.2.0/)
   [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-  [![CI](https://github.com/wkambale/jax-gemini/actions/workflows/ci.yml/badge.svg)](https://github.com/wkambale/jax-gemini/actions/workflows/ci.yml)
+  [![CI](https://github.com/wkambale/jaxforge/actions/workflows/ci.yml/badge.svg)](https://github.com/wkambale/jaxforge/actions/workflows/ci.yml)
 </div>
 
-Package version: `0.1.3` ([PyPI](https://pypi.org/project/jax-gemini/0.1.3/)) | Supported Python: 3.10 to 3.12 | [Documentation site](https://wkambale.github.io/jax-gemini) | License: [MIT](LICENSE)
+`jaxforge` (product name **Jax Forge**, formerly `jax-gemini`) enables machine learning engineers and researchers to preview, validate, build, train, explore, and export JAX and Flax workflows from natural language across any frontier or local LLM provider.
 
-`jax-gemini` enables machine learning engineers and researchers to build, train, evaluate, and persist JAX and Flax neural networks from plain English prompts without writing repetitive boilerplate.
-
-Unlike text-only LLM wrappers, `jax-gemini` executes validated generated code inside an isolated sandbox and returns live `flax.nnx.Module` instances, trained weights, evaluation dictionaries, and confined checkpoints.
+Unlike blind code-execution wrappers, `jaxforge` supports an inspect-first gate (`preview()`, `dry_run=True`, or `approve=` callbacks), privacy-preserving `DatasetProfile` summaries, unified diff edits, metric-guided tree-search exploration (`explore()`), isolated execution backends, and standalone Python package exports.
 
 ## Core features
 
-- **Executable JAX objects**: Returns instantiated `flax.nnx.Module` models, trained Optax states, and structured metrics dictionaries.
-- **Bounded conversational memory**: Retains multi-turn refinement context and the active model state so follow-up calls such as `jg.modify()` and `jg.train()` build upon prior steps cleanly.
-- **Layered sandbox validation**: Enforces AST size and node budgets, intent-scoped import allowlists, read-only module proxies, confined filesystem I/O, and execution timeouts.
-- **Self-healing retry loop**: Sanitizes tracebacks and redacts paths and credentials before returning failure context to Gemini for correction, with per-attempt `runtime_args` rollback.
-- **Pipeline and Flax/Optax utilities**: Includes composable pipeline wrappers in `jax_gemini.pipeline` and inspection helpers in `jax_gemini.contrib`.
+- **Inspect-first preview and approval**: Generate and AST-validate code with `jf.preview()` or `dry_run=True` to inspect source code, unified diffs, and shape estimates before running compute.
+- **Multi-provider LLM routing**: Use Google Gemini, OpenAI, Anthropic Claude, OpenRouter, LiteLLM, or local Ollama and vLLM servers through `provider` or `model_name` prefixes (such as `anthropic:claude-sonnet-4-5`, `openai:gpt-5`, or `ollama:qwen2.5-coder:32b`) with fast/primary routing.
+- **Production JAX workflows**: Supports Flax NNX and Equinox modeling, Optax schedules, `jax.sharding` device meshes, Grain streaming datasets, Orbax and Safetensors checkpoints, and `jax.eval_shape` checks.
+- **Pluggable sandbox isolation**: Enforces AST allowlists, `WeakKeyDictionary` module proxies, and confined file I/O across `thread`, `subprocess` (with memory/CPU limits), `docker`, `e2b`, and `modal` backends.
+- **Branching exploration and project export**: Compare candidate strategies with `jf.explore()` and materialize clean standalone Python packages via `jf.export_project()`, the `jaxforge` CLI, or the MCP server.
 
 ## Quickstart
 
 ### Installation
 
-Install the core package from [PyPI](https://pypi.org/project/jax-gemini/0.1.3/):
+Install `jaxforge` from [PyPI](https://pypi.org/project/jaxforge/0.2.0/):
 
 ```bash
-pip install jax-gemini
+pip install jaxforge
 ```
 
-Install optional plotting support for `jg.visualize_data()`:
+Optional extras install provider SDKs, modeling frameworks, sandboxes, or plotting:
 
 ```bash
-pip install "jax-gemini[viz]"
+pip install "jaxforge[google,openai,anthropic,viz]"
+pip install "jaxforge[equinox,grain,safetensors]"
+pip install "jaxforge[docker,e2b,modal,mcp]"
 ```
 
-Export your [Gemini API key](https://aistudio.google.com/):
+Configure an API key for your chosen provider (or point `base_url` at a local Ollama or vLLM endpoint):
 
 ```bash
-export GEMINI_API_KEY="your-api-key-here"
+export GEMINI_API_KEY="your-key"      # or OPENAI_API_KEY / ANTHROPIC_API_KEY
 ```
 
-### Conversational model workflow
+### Preview, approve, train, and export
 
 ```python
-import jax_gemini as jg
+import jaxforge as jf
 import numpy as np
 
-# Configuration reads GEMINI_API_KEY from the environment when left unset
-jg.config.set({"model_name": "gemini-3.1-pro"})
+# Switch providers freely: "gemini-3.1-pro", "openai:gpt-5", "anthropic:claude-sonnet-4-5", "ollama:llama3"
+jf.config.set({"model_name": "anthropic:claude-sonnet-4-5"})
 
-# Build a model from natural language
-model = jg.build("Build a 4-layer MLP for handwritten digit classification")
+# Preview code and validation status before running anything
+plan = jf.preview("Build a 4-layer MLP for 28x28 digit classification")
+print(plan.code)
 
-# Refine the architecture across turns
-model = jg.modify("Add dropout with rate 0.2 between each hidden layer")
+# Execute after review, or use build/modify/train with interactive approval
+model = jf.build("Build a 4-layer MLP for digit classification")
+model = jf.modify("Add dropout with rate 0.2 between hidden layers")
 
-# Train the active model
 X_train = np.random.randn(100, 28, 28, 1).astype(np.float32)
 y_train = np.random.randint(0, 10, size=(100,))
 
-model, metrics = jg.train(
-    "Train for 10 epochs with Adam and cross-entropy loss",
+# Explore multiple candidate training runs against validation accuracy
+experiment = jf.explore(
+    "Train classifier with cosine learning-rate decay",
     dataset=(X_train, y_train),
+    metric="accuracy",
+    candidates=3,
 )
-print(f"Accuracy: {metrics['accuracy']:.2%}")
+print("Best accuracy:", experiment.best_candidate.score)
 
-# Persist checkpoints inside config.checkpoint_dir
-checkpoint_path = jg.save("digit_classifier_v1")
-
-# Dispatch by intent automatically
-eval_metrics = jg.run("Evaluate accuracy on the test set", dataset=(X_train, y_train))
+# Export generated modules into a standalone installable repository
+jf.export_project("./exported_classifier", package_name="digit_classifier")
 ```
 
-See [examples/](examples/) for end-to-end Python scripts and Jupyter notebooks.
+### CLI and MCP server
+
+```bash
+jaxforge info
+jaxforge devices
+jaxforge preview "Build a Flax NNX residual classifier" --export ./out_pkg
+jaxforge mcp
+```
+
+See [examples/](examples/) for end-to-end Python scripts and notebooks.
 
 ## Documentation
 
-- [Quickstart guide](docs/quickstart.md): Installation, session lifecycle, training, and checkpointing.
-- [API reference](docs/api-reference.md): Public functions, configuration fields, pipeline stages, and contrib helpers.
-- [Architecture internals](docs/architecture.md): Module boundaries across generation, validation, sandbox execution, and memory.
+Full hosted documentation is published at [wkambale.github.io/jaxforge](https://wkambale.github.io/jaxforge):
+
+- [Quickstart guide](docs/quickstart.md): Installation, provider configuration, preview gates, training, and project export.
+- [API reference](docs/api-reference.md): Public functions, `GeneratedPlan`, execution backends, CLI, and contrib helpers.
+- [Architecture internals](docs/architecture.md): Multi-provider routing, AST validation, sandbox backends, and memory.
 - [Security protocol](docs/security.md): AST rules, import scoping, runtime proxies, path confinement, and timeout enforcement.
 
 ## License and contributing

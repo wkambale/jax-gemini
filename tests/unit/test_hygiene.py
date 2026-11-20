@@ -1,7 +1,7 @@
 import pathlib
 import re
 
-import jax_gemini
+import jaxforge
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 _FORBIDDEN_DASH_RE = re.compile(r"[\u2014\u2013]")
@@ -32,7 +32,7 @@ class TestEditorialAndVersionHygiene:
         pyproject_text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
         match = _VERSION_RE.search(pyproject_text)
         assert match is not None
-        assert jax_gemini.__version__ == match.group(1)
+        assert jaxforge.__version__ == match.group(1)
 
     def test_no_em_or_en_dashes_or_emojis(self):
         for path in _iter_repo_files():

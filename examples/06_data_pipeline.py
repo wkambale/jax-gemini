@@ -1,12 +1,12 @@
 import numpy as np
 
-import jax_gemini as jg
+import jaxforge as jf
 
 
 def main():
     print("Setting up Jax Gemini Config...")
     # Using a fake key for local execution testing since actual key relies on user's env
-    jg.config.set({"model_name": "gemini-3.1-pro"})
+    jf.config.set({"model_name": "gemini-3.1-pro"})
 
     print("Generating synthetic data...")
     _ = np.random.randn(100, 2)
@@ -17,7 +17,7 @@ def main():
 
     print("Building Data Pipeline...")
     try:
-        _ = jg.load_data("Load a synthetic dataset of 100 rows and 2 columns from memory")
+        _ = jf.load_data("Load a synthetic dataset of 100 rows and 2 columns from memory")
         print("Data loaded successfully.")
     except Exception as e:
         print(f"Skipping actual API call due to missing key: {e}")

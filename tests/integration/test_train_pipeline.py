@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-import jax_gemini as jg
+import jaxforge as jf
 
 MOCK_TRAIN_RESPONSE = {
     "intent": "train",
@@ -17,7 +17,7 @@ MOCK_TRAIN_RESPONSE = {
 
 
 class TestTrainPipeline:
-    @patch("jax_gemini.llm.gemini.genai")
+    @patch("jaxforge.llm.gemini.genai")
     def test_train_pipeline(self, mock_genai, config):
         import json
 
@@ -25,7 +25,7 @@ class TestTrainPipeline:
         mock_response.text = json.dumps(MOCK_TRAIN_RESPONSE)
         mock_genai.GenerativeModel.return_value.generate_content.return_value = mock_response
 
-        agent = jg.JaxGemini(config=config)
+        agent = jf.JaxForge(config=config)
         agent._current_model = "mock_model"
 
         X = np.zeros((10, 10))

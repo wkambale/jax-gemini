@@ -35,7 +35,7 @@ jobs:
         run: mypy src
 
       - name: Run unit and integration tests with coverage
-        run: pytest --cov=jax_gemini --cov-report=term-missing tests/
+        run: pytest --cov=jaxforge --cov-report=term-missing tests/
 
       - name: Verify MkDocs documentation build
         run: mkdocs build --strict

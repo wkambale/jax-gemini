@@ -44,7 +44,7 @@ jobs:
         run: |
           ruff check src tests examples
           mypy src
-          pytest --cov=jax_gemini tests/
+          pytest --cov=jaxforge tests/
 
       - name: Build sdist and wheel
         run: |
@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/jax-gemini
+      url: https://pypi.org/p/jaxforge
     permissions:
       id-token: write
     steps:

@@ -1,94 +1,81 @@
 # Quickstart guide
 
-This guide walks through installing `jax-gemini` and executing common model workflows.
+This guide walks through installing `jaxforge` (**Jax Forge**), choosing an LLM provider, previewing generated code, training, exploring, and exporting standalone packages.
 
 ## Prerequisites
 
-Install version `0.1.3` from [PyPI](https://pypi.org/project/jax-gemini/0.1.3/):
+Install version `0.2.0` from [PyPI](https://pypi.org/project/jaxforge/0.2.0/):
 
 ```bash
-pip install jax-gemini
+pip install jaxforge
 ```
 
-If you plan to generate plots with `jg.visualize_data()`, include the optional visualization extra:
+Optional extras add plotting, provider SDKs, Equinox/Grain/Safetensors, remote sandboxes, or MCP support:
 
 ```bash
-pip install "jax-gemini[viz]"
+pip install "jaxforge[viz,equinox,grain,safetensors]"
 ```
 
-Configure your Gemini API key via the `GEMINI_API_KEY` environment variable or explicitly through `jg.config.set()`:
+Configure credentials for Google Gemini, OpenAI, Anthropic, OpenRouter, or point `base_url` at local Ollama:
 
 ```python
-import os
-import jax_gemini as jg
+import jaxforge as jf
 
-jg.config.set({
-    "gemini_api_key": os.environ.get("GEMINI_API_KEY"),
-    "model_name": "gemini-3.1-pro",
+jf.config.set({
+    "model_name": "openai:gpt-5",  # or "gemini-3.1-pro", "anthropic:claude-sonnet-4-5", "ollama:llama3"
     "temperature": 0.2,
 })
 ```
 
-## Build a model
+## Preview code before execution
 
-Call `jg.build()` with a natural-language architecture specification. `jax-gemini` generates `flax.nnx` code, validates it, executes it in the sandbox, and returns the instantiated `flax.nnx.Module`.
+Call `jf.preview()` (or pass `dry_run=True` to `build()`, `modify()`, or `train()`) to inspect validated source code and diffs without executing compute:
 
 ```python
-my_model = jg.build(
-    "Design a CNN for 32x32 RGB image classification using two convolutional blocks, "
-    "max pooling, and dense classification layers."
+plan = jf.preview(
+    "Design a CNN for 32x32 RGB image classification using two convolutional blocks and dense heads."
 )
+print(plan.code)
+model = jf._default_agent.execute_plan(plan)
 ```
 
-## Refine iteratively
+## Build, refine, and inspect
 
-Session memory tracks prior turns and the active model state so follow-up modifications build on your existing architecture:
+Call `jf.build()` directly when auto-approval is enabled, then iterate with `jf.modify()` (which requests targeted unified diffs when possible):
 
 ```python
-my_model = jg.modify(
-    "Add dropout with rate 0.25 between the convolutional blocks to reduce overfitting."
-)
+my_model = jf.build("Build a 3-layer Flax NNX classifier")
+my_model = jf.modify("Add dropout with rate 0.25 between hidden layers")
+print(jf.show_code())
+print(jf.explain())
 ```
 
-## Inspect generated code
+## Train, evaluate, and explore
 
-You can review the validated Python source and Gemini's explanation at any point after an operation succeeds:
-
-```python
-print(jg.show_code())
-print(jg.explain())
-```
-
-## Train and evaluate
-
-Pass `(X, y)` NumPy array tuples into `jg.train()` and `jg.evaluate()`:
+Pass `(X, y)` NumPy array tuples or streaming batches into `jf.train()`, `jf.evaluate()`, or metric-guided `jf.explore()`:
 
 ```python
-trained_model, metrics = jg.train(
-    prompt="Train for 15 epochs with categorical cross-entropy loss and Adam",
+trained_model, metrics = jf.train(
+    prompt="Train for 15 epochs with categorical cross-entropy loss and AdamW",
     dataset=(X_train, y_train),
 )
-print("Training loss:", metrics["loss"])
 
-results = jg.evaluate(
-    "Compute test set accuracy and loss",
-    dataset=(X_test, y_test),
+experiment = jf.explore(
+    "Tune regularization and optimizer schedule",
+    dataset=(X_train, y_train),
+    metric="accuracy",
+    candidates=3,
 )
+print("Best score:", experiment.best_candidate.score)
 ```
 
-## Save and load checkpoints
+## Save, load, and export standalone packages
 
-Checkpoints are stored via Orbax strictly inside `config.checkpoint_dir` using relative names:
-
-```python
-ckpt_path = jg.save("v1_cnn_model_production")
-restored_model = jg.load("v1_cnn_model_production")
-```
-
-## Automatic intent routing
-
-If you prefer a single entrypoint, `jg.run()` classifies the prompt with `IntentClassifier` and dispatches to the corresponding operation:
+Save Orbax checkpoints inside `config.checkpoint_dir`, or export a clean installable project with unit smoke tests:
 
 ```python
-results = jg.run("Evaluate model accuracy on test set", dataset=(X_test, y_test))
+ckpt_path = jf.save("v1_cnn_model")
+restored_model = jf.load("v1_cnn_model")
+
+jf.export_project("./my_exported_model", package_name="my_exported_model")
 ```

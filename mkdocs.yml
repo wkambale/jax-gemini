@@ -1,8 +1,8 @@
-site_name: Jax Gemini
-site_description: Natural language-driven JAX and Flax model building powered by Gemini
-site_url: https://wkambale.github.io/jax-gemini
-repo_url: https://github.com/wkambale/jax-gemini
-repo_name: wkambale/jax-gemini
+site_name: Jax Forge
+site_description: Model-agnostic natural language engineering workbench for JAX and Flax
+site_url: https://wkambale.github.io/jaxforge
+repo_url: https://github.com/wkambale/jaxforge
+repo_name: wkambale/jaxforge
 edit_uri: edit/main/docs/
 
 theme:

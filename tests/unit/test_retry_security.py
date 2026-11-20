@@ -3,8 +3,8 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-import jax_gemini as jg
-from jax_gemini.codegen.fixer import CodeFixer, sanitize_error_for_llm
+import jaxforge as jf
+from jaxforge.codegen.fixer import CodeFixer, sanitize_error_for_llm
 
 
 class TestRetrySecurity:
@@ -34,7 +34,7 @@ class TestRetrySecurity:
         assert "matplotlib" in prompt
         assert "functools" in prompt
 
-    @patch("jax_gemini.llm.gemini.genai")
+    @patch("jaxforge.llm.gemini.genai")
     def test_failed_attempt_does_not_mutate_runtime_args_and_sanitizes_retry(self, mock_genai):
         bad_resp = MagicMock()
         bad_resp.text = json.dumps(
@@ -69,7 +69,7 @@ class TestRetrySecurity:
             good_resp,
         ]
 
-        agent = jg.JaxGemini(jg.JaxGeminiConfig(gemini_api_key="test-key", max_retries=2))
+        agent = jf.JaxForge(jf.JaxForgeConfig(gemini_api_key="test-key", max_retries=2))
         agent._current_model = {"weights": [1.0]}
         x = np.array([1.0, 2.0])
         y = np.array([0, 1])
@@ -78,7 +78,7 @@ class TestRetrySecurity:
         assert x[0] == 1.0
         assert agent._current_model == {"weights": [1.0]}
 
-    @patch("jax_gemini.llm.gemini.genai")
+    @patch("jaxforge.llm.gemini.genai")
     def test_validation_error_retry_does_not_leak_whitelist(self, mock_genai):
         bad_val = MagicMock()
         bad_val.text = json.dumps(
@@ -103,7 +103,7 @@ class TestRetrySecurity:
             good_val,
         ]
 
-        agent = jg.JaxGemini(jg.JaxGeminiConfig(gemini_api_key="test-key", max_retries=2))
+        agent = jf.JaxForge(jf.JaxForgeConfig(gemini_api_key="test-key", max_retries=2))
         assert agent.build("Build") == 1
         second_call_messages = (
             mock_genai.GenerativeModel.return_value.generate_content.call_args_list[1].args[0]

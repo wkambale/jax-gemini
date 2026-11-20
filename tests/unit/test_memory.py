@@ -1,6 +1,6 @@
 import pytest
 
-from jax_gemini.memory.conversation import ConversationMemory
+from jaxforge.memory.conversation import ConversationMemory
 
 
 class TestConversationMemory:
