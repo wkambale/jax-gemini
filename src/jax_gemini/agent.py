@@ -86,7 +86,11 @@ class JaxGemini:
                     else (Path.cwd(), Path(self.config.checkpoint_dir))
                 )
                 result = self._executor.run(
-                    code, intent, runtime_args, allowed_dirs=allowed_dirs
+                    code,
+                    intent,
+                    runtime_args,
+                    allowed_dirs=allowed_dirs,
+                    timeout_seconds=self.config.timeout_seconds,
                 )
 
                 # Success — update state
