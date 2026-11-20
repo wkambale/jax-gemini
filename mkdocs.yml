@@ -22,7 +22,6 @@ theme:
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.sections
-    - navigation.expand
     - navigation.footer
     - navigation.top
     - search.suggest
@@ -58,17 +57,19 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Quickstart: quickstart.md
-  - LLM providers: providers.md
-  - Core workflows:
+  - Providers: providers.md
+  - Workflows:
       - Preview and diffs: preview-and-diffs.md
       - Training and exploration: training-and-exploration.md
       - Export and checkpoints: export-and-checkpoints.md
-  - Execution backends: backends.md
-  - Distributed sharding: sharding.md
-  - Async support: async.md
-  - CLI and MCP server: cli-and-mcp.md
+  - Guides:
+      - Execution backends: backends.md
+      - Distributed sharding: sharding.md
+      - Asynchronous support: async.md
+      - CLI and MCP server: cli-and-mcp.md
   - API reference: api-reference.md
-  - Architecture internals: architecture.md
-  - Security protocol: security.md
-  - Changelog: changelog.md
-  - Contributing: contributing.md
+  - Project:
+      - Architecture internals: architecture.md
+      - Security protocol: security.md
+      - Changelog: changelog.md
+      - Contributing: contributing.md

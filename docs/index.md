@@ -3,13 +3,6 @@ hide:
   - toc
 ---
 
-<div class="jf-badges">
-  <a href="https://pypi.org/project/jaxforge/0.2.0/"><img src="https://img.shields.io/pypi/v/jaxforge.svg" alt="PyPI version"></a>
-  <a href="https://pypi.org/project/jaxforge/0.2.0/"><img src="https://img.shields.io/pypi/pyversions/jaxforge.svg" alt="Python Versions"></a>
-  <a href="https://github.com/wkambale/jaxforge/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License"></a>
-  <a href="https://github.com/wkambale/jaxforge/actions/workflows/ci.yml"><img src="https://github.com/wkambale/jaxforge/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-</div>
-
 <section class="jf-hero">
   <svg class="jf-hero__rings" viewBox="0 0 240 240" fill="none" aria-hidden="true">
     <circle cx="150" cy="90" r="52" stroke="rgba(251, 146, 60, 0.34)" stroke-width="1.5"/>
@@ -35,6 +28,13 @@ hide:
     <rect width="1200" height="18" fill="url(#jf-chevron-pattern)"/>
   </svg>
 </section>
+
+<div class="jf-badges">
+  <a href="https://pypi.org/project/jaxforge/0.2.0/"><img src="https://img.shields.io/pypi/v/jaxforge.svg" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/jaxforge/0.2.0/"><img src="https://img.shields.io/pypi/pyversions/jaxforge.svg" alt="Python Versions"></a>
+  <a href="https://github.com/wkambale/jaxforge/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License"></a>
+  <a href="https://github.com/wkambale/jaxforge/actions/workflows/ci.yml"><img src="https://github.com/wkambale/jaxforge/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</div>
 
 ## Core capabilities
 
