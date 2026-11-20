@@ -23,6 +23,7 @@ class JaxGemini:
     def __init__(self, config: JaxGeminiConfig | None = None):
         self.config = config or JaxGeminiConfig()
         self._llm: GeminiLLM | None = None
+        self._llm_api_key: str | None = None
         self._memory = ConversationMemory()
         self._executor = SandboxExecutor()
         self._last_code: str | None = None
@@ -30,9 +31,11 @@ class JaxGemini:
         self._current_model: Any = None
 
     def _get_llm(self) -> GeminiLLM:
-        if self._llm is None:
-            self.config.validate()
+        self.config.validate()
+        effective_key = self.config.gemini_api_key or os.environ.get("GEMINI_API_KEY")
+        if self._llm is None or self._llm_api_key != effective_key:
             self._llm = GeminiLLM(self.config)
+            self._llm_api_key = effective_key
         return self._llm
 
     def _log(self, message: str) -> None:
@@ -240,9 +243,11 @@ class JaxGemini:
         return self._last_code
 
     def reset(self) -> None:
-        """Clear all conversation history and model state."""
+        """Clear all conversation history, cached LLM client, and model state."""
         self._memory.reset()
         self._current_model = None
         self._last_code = None
         self._last_response = None
-        self._log("Session reset. Memory cleared.")
+        self._llm = None
+        self._llm_api_key = None
+        self._log("Session reset. Memory and cached LLM client cleared.")
