@@ -2,7 +2,7 @@ import builtins
 import os
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from types import ModuleType
+from types import MappingProxyType, ModuleType
 from typing import Any
 
 import flax
@@ -79,9 +79,15 @@ class _SafeModuleProxy(ModuleType):
         if name in overrides:
             return overrides[name]
         target: ModuleType = object.__getattribute__(self, "_target")
-        return getattr(target, name)
+        attr = getattr(target, name)
+        if isinstance(attr, ModuleType) and not isinstance(attr, _SafeModuleProxy):
+            return _SafeModuleProxy(attr)
+        return attr
 
     def __setattr__(self, name: str, value: Any) -> None:
+        raise AttributeError("Sandbox module proxies are read-only.")
+
+    def __delattr__(self, name: str) -> None:
         raise AttributeError("Sandbox module proxies are read-only.")
 
 
@@ -177,11 +183,18 @@ def _make_safe_import(
         root = name.split(".")[0]
         if root not in allowed_imports:
             raise ImportError(f"Import '{name}' is not allowed.")
-        if name in safe_modules:
-            return safe_modules[name]
-        mod = builtins.__import__(name, globals, locals, fromlist, level)
-        if not fromlist and root in safe_modules:
+        if fromlist:
+            if name in safe_modules:
+                return safe_modules[name]
+            mod = builtins.__import__(name, globals, locals, fromlist, level)
+            if isinstance(mod, ModuleType) and not isinstance(mod, _SafeModuleProxy):
+                return _SafeModuleProxy(mod)
+            return mod
+        if root in safe_modules:
             return safe_modules[root]
+        mod = builtins.__import__(name, globals, locals, fromlist, level)
+        if isinstance(mod, ModuleType) and not isinstance(mod, _SafeModuleProxy):
+            return _SafeModuleProxy(mod)
         return mod
 
     return _safe_import
@@ -198,7 +211,7 @@ def _safe_import(
     return _make_safe_import(WHITELIST_IMPORTS, {})(name, globals, locals, fromlist, level)
 
 
-SAFE_BUILTINS: dict[str, Any] = {
+_RAW_SAFE_BUILTINS: dict[str, Any] = {
     name: getattr(builtins, name, None)
     for name in [
         "print",
@@ -239,33 +252,28 @@ SAFE_BUILTINS: dict[str, Any] = {
     ]
     if getattr(builtins, name, None) is not None
 }
-SAFE_BUILTINS["__import__"] = _safe_import
+_RAW_SAFE_BUILTINS["__import__"] = _safe_import
+SAFE_BUILTINS: Mapping[str, Any] = MappingProxyType(_RAW_SAFE_BUILTINS)
 
-BASE_NAMESPACE: dict[str, Any] = {
-    "jax": jax,
-    "jnp": jnp,
-    "flax": flax,
-    "nnx": nnx,
-    "optax": optax,
-    "np": np,
-    "__name__": "jax_gemini_sandbox",
-    "__builtins__": SAFE_BUILTINS,
-}
-
-if _orbax_available:
-    BASE_NAMESPACE["ocp"] = ocp
-    BASE_NAMESPACE["orbax"] = orbax
-
-if _matplotlib_available:
-    BASE_NAMESPACE["plt"] = plt
-    BASE_NAMESPACE["matplotlib"] = matplotlib
+BASE_NAMESPACE: Mapping[str, Any] = MappingProxyType(
+    {
+        "jax": _SafeModuleProxy(jax),
+        "jnp": _SafeModuleProxy(jnp),
+        "flax": _SafeModuleProxy(flax),
+        "nnx": _SafeModuleProxy(nnx),
+        "optax": _SafeModuleProxy(optax),
+        "np": _SafeModuleProxy(np),
+        "__name__": "jax_gemini_sandbox",
+        "__builtins__": SAFE_BUILTINS,
+    }
+)
 
 
 def get_execution_namespace(
     intent: str = "build",
     allowed_dirs: tuple[Path | str, ...] | None = None,
 ) -> dict[str, Any]:
-    """Return a fresh sandbox namespace scoped to intent and allowed directories."""
+    """Return a fresh, isolated sandbox namespace scoped to intent and allowed directories."""
     resolved_dirs = (
         tuple(Path(d).resolve() for d in allowed_dirs)
         if allowed_dirs
@@ -273,15 +281,28 @@ def get_execution_namespace(
     )
     allowed_imports = INTENT_ALLOWED_IMPORTS.get(intent, WHITELIST_IMPORTS)
 
+    safe_jnp = _SafeModuleProxy(jnp)
+    safe_jax = _SafeModuleProxy(jax, overrides={"numpy": safe_jnp})
+    safe_nnx = _SafeModuleProxy(nnx)
+    safe_flax = _SafeModuleProxy(flax, overrides={"nnx": safe_nnx})
+    safe_optax = _SafeModuleProxy(optax)
     safe_np = _create_safe_numpy(resolved_dirs)
-    safe_modules: dict[str, ModuleType] = {"numpy": safe_np}
+
+    safe_modules: dict[str, ModuleType] = {
+        "jax": safe_jax,
+        "jax.numpy": safe_jnp,
+        "flax": safe_flax,
+        "flax.nnx": safe_nnx,
+        "optax": safe_optax,
+        "numpy": safe_np,
+    }
 
     namespace: dict[str, Any] = {
-        "jax": jax,
-        "jnp": jnp,
-        "flax": flax,
-        "nnx": nnx,
-        "optax": optax,
+        "jax": safe_jax,
+        "jnp": safe_jnp,
+        "flax": safe_flax,
+        "nnx": safe_nnx,
+        "optax": safe_optax,
         "np": safe_np,
         "__name__": "jax_gemini_sandbox",
     }
