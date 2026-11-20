@@ -40,3 +40,10 @@ class JaxGeminiConfig:
             raise JaxGeminiConfigError("temperature must be between 0.0 and 1.0")
         if self.max_retries < 1 or self.max_retries > 5:
             raise JaxGeminiConfigError("max_retries must be between 1 and 5")
+        if (
+            not isinstance(self.checkpoint_dir, str)
+            or not self.checkpoint_dir.strip()
+            or "\x00" in self.checkpoint_dir
+            or "://" in self.checkpoint_dir
+        ):
+            raise JaxGeminiConfigError("checkpoint_dir must be a non-empty local directory path")

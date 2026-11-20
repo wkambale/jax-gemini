@@ -8,7 +8,11 @@ from jax_gemini.codegen.fixer import CodeFixer
 from jax_gemini.codegen.parser import CodeParser
 from jax_gemini.codegen.validator import CodeValidator
 from jax_gemini.config import JaxGeminiConfig
-from jax_gemini.exceptions import JaxGeminiExecutionError, JaxGeminiValidationError
+from jax_gemini.exceptions import (
+    JaxGeminiCheckpointError,
+    JaxGeminiExecutionError,
+    JaxGeminiValidationError,
+)
 from jax_gemini.llm.gemini import GeminiLLM
 from jax_gemini.memory.conversation import ConversationMemory
 from jax_gemini.prompts.context_builder import ContextBuilder
@@ -151,12 +155,38 @@ class JaxGemini:
             self._generate_and_execute(prompt, intent="evaluate", runtime_args=args),
         )
 
+    def _resolve_checkpoint_path(self, name: str) -> str:
+        """Resolve a checkpoint name strictly inside self.config.checkpoint_dir."""
+        if not isinstance(name, str):
+            raise JaxGeminiCheckpointError("Checkpoint name must be a string.")
+        cleaned = name.strip()
+        if (
+            not cleaned
+            or "\x00" in cleaned
+            or "\n" in cleaned
+            or "\r" in cleaned
+            or "://" in cleaned
+        ):
+            raise JaxGeminiCheckpointError(f"Invalid checkpoint name: '{name}'")
+        raw = Path(cleaned)
+        if raw.is_absolute() or os.path.isabs(cleaned) or ".." in raw.parts:
+            raise JaxGeminiCheckpointError(
+                f"Checkpoint name '{name}' must be a relative path within checkpoint_dir."
+            )
+        base_dir = Path(self.config.checkpoint_dir).resolve()
+        candidate = (base_dir / raw).resolve()
+        if candidate == base_dir or not candidate.is_relative_to(base_dir):
+            raise JaxGeminiCheckpointError(
+                f"Checkpoint path '{name}' escapes checkpoint_dir '{self.config.checkpoint_dir}'."
+            )
+        return str(candidate)
+
     def save(self, name: str) -> str:
         """Save the current model checkpoint. Returns the checkpoint path."""
-        path = os.path.join(self.config.checkpoint_dir, name)
+        path = self._resolve_checkpoint_path(name)
         return str(
             self._generate_and_execute(
-                f"Save the model to {path}",
+                "Save the model checkpoint to the provided path argument.",
                 intent="save",
                 runtime_args={"model": self._current_model, "path": path},
             )
@@ -164,9 +194,11 @@ class JaxGemini:
 
     def load(self, name: str) -> Any:
         """Load a model checkpoint by name."""
-        path = os.path.join(self.config.checkpoint_dir, name)
+        path = self._resolve_checkpoint_path(name)
         model = self._generate_and_execute(
-            f"Load the model from {path}", intent="load", runtime_args={"path": path}
+            "Load the model checkpoint from the provided path argument.",
+            intent="load",
+            runtime_args={"path": path},
         )
         self._current_model = model
         return model

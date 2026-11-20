@@ -29,3 +29,8 @@ class TestConfig:
     def test_validate_with_api_key(self):
         config = JaxGeminiConfig(gemini_api_key="key")
         config.validate()  # should not raise
+
+    def test_validate_invalid_checkpoint_dir_raises(self):
+        config = JaxGeminiConfig(gemini_api_key="key", checkpoint_dir="   ")
+        with pytest.raises(JaxGeminiConfigError, match="checkpoint_dir"):
+            config.validate()
