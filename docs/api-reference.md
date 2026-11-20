@@ -1,78 +1,69 @@
 # API Reference
 
-The `jax-gemini` surface is optimized to be minimalistic while empowering high-scale deployment patterns seamlessly interacting underneath. Here are the core methods exposed for utilizing the overarching engine state.
+The `jax-gemini` package exposes both top-level session helpers (`jg.build`, `jg.train`, etc.) backed by a default `JaxGemini` instance for interactive usage, and the `JaxGemini` class for isolated multi-instance or programmatic workflows.
 
 ---
 
 ### `jg.config.set(updates: dict) -> None`
-Overrides configuration options securely initializing connections.
+Atomically validates and updates configuration fields on `JaxGeminiConfig`.
 
-**Parameters:**
-- `updates` *(dict)*: Dictionary mapping override configuration elements.
-  - `gemini_api_key` *(str)*: Direct API Key setting (Default: None — resolves os variables).
-  - `model_name` *(str)*: Target AI identifier (Default: `gemini-3.1-pro`).
-  - `temperature` *(float)*: Deterministic variance control (Default: `0.2`).
-  - `max_retries` *(int)*: Loop attempts upon code failure checks (Default: `3`).
-  - `verbose` *(bool)*: Prints internal system execution states (Default: `False`).
+**Fields:**
+- `gemini_api_key` *(str | None)*: Gemini API key (Default: `None`, resolves `GEMINI_API_KEY` from environment).
+- `model_name` *(str)*: Gemini model identifier (Default: `"gemini-3.1-pro"`).
+- `temperature` *(float)*: Sampling temperature in `[0.0, 1.0]` (Default: `0.2`).
+- `max_output_tokens` *(int)*: Maximum output tokens in `[1, 65536]` (Default: `4096`).
+- `max_retries` *(int)*: Generation/execution retry attempts in `[1, 5]` (Default: `3`).
+- `verbose` *(bool)*: Print execution logs (Default: `False`).
+- `checkpoint_dir` *(str)*: Base directory for confined checkpoint persistence (Default: `"./jax_gemini_checkpoints"`).
+- `timeout_seconds` *(int)*: Per-step LLM & sandbox execution timeout in `[1, 3600]` (Default: `60`).
+
+---
+
+### `jg.run(prompt: str, dataset: Any = None, name: str | None = None) -> Any`
+Automatically classifies `prompt` with `IntentClassifier` and routes it to the matching `JaxGemini` operation (`build`/`modify`, `train`, `evaluate`, `save`, `load`, `load_data`, `preprocess_data`, `analyze_data`, or `visualize_data`).
 
 ---
 
 ### `jg.build(prompt: str) -> Any`
-Primary mechanism resolving unstructured natural language concepts translating directly to executable model classes. Function maintains the global Context Session Memory caching changes.
-
-**Parameters:**
-- `prompt` *(str)*: Natural language descriptive instruction block dictating architecture.
-
-**Returns:**
-- Generated `flax.nnx.Module` object reflecting instantiation requested in prompt parameters.
+Generates and executes a `flax.nnx.Module` from a natural-language architecture description and sets it as the active session model.
 
 ---
 
 ### `jg.modify(prompt: str) -> Any`
-Alters pre-existing internal active `model` parameters. It preserves execution histories and appends modifier steps updating representations in LLM conversational turns.
-
-**Parameters:**
-- `prompt` *(str)*: Refinement syntax command describing changes mapping across previous nodes.
-
-**Returns:**
-- Mutated fresh `flax.nnx.Module` object replacement.
+Refines the current model based on a natural-language instruction while preserving session history and current model state context.
 
 ---
 
-### `jg.train(prompt: str, dataset: tuple = None) -> tuple[Any, dict]`
-Translates human inputs generating encapsulated Optax training epochs safely returning back results.
-
-**Parameters:**
-- `prompt` *(str)*: Natural language detailing hyperparameters `optim... (i.e. 'adam')`, `loss...`, epochs.
-- `dataset` *(tuple)* Numpy Array structured tuples representing dataset splits: `(X_train, y_train)`.
-
-**Returns:**
-- Generates a Tuple element formatted natively spanning `(trained_model, {"accuracy": value, "loss": value})`.
+### `jg.train(prompt: str, dataset: tuple | None = None) -> tuple[Any, dict]`
+Trains the current model with an Optax loop and returns `(trained_model, metrics_dict)`.
 
 ---
 
-### `jg.evaluate(prompt: str, dataset: tuple = None) -> dict`
-Passes evaluations measuring targets against model configurations accurately resolving outputs directly.
-
-**Parameters:**
-- `prompt` *(str)*: Metric evaluations descriptions.
-- `dataset` *(tuple)*: Evaluated `(X_test, y_test)` splits.
-
-**Returns:**
-- Returns Python `dict` output tracking evaluated indices such as `{"accuracy": 0.95, ...}`.
+### `jg.evaluate(prompt: str, dataset: tuple | None = None) -> dict`
+Evaluates the active model on `(X_test, y_test)` and returns a metrics dictionary.
 
 ---
 
-### `jg.save(name: str) -> str`
-Handles state representation abstractions safely triggering Orbax `PyTreeCheckpointer` executions persisting paths securely.
-
-**Parameters:**
-- `name` *(str)*: Checkpoint relative output name (appends to root config settings `./jax_gemini_checkpoints`).
-
-**Returns:**
-- Serialized path string resolution output dictating active storage directories.
+### `jg.save(name: str) -> str` / `jg.load(name: str) -> Any`
+Saves or loads the active model checkpoint under a relative `name` strictly contained within `config.checkpoint_dir`.
 
 ---
 
-### `jg.reset() -> None`
-Wipes out conversational memory stores explicitly unmounting previous historical architecture components avoiding bleeding states across subsequent test attempts.
+### Data Pipeline Methods
+- `jg.load_data(prompt: str) -> Any`: Load or synthesize a dataset in memory.
+- `jg.preprocess_data(prompt: str, dataset: Any) -> Any`: Preprocess or transform a dataset.
+- `jg.analyze_data(prompt: str, dataset: Any) -> Any`: Compute dataset statistics or summaries.
+- `jg.visualize_data(prompt: str, dataset: Any) -> Any`: Generate plots/figures (requires `jax-gemini[viz]`).
+
+---
+
+### Inspection & Session Control
+- `jg.explain() -> str`: Return Gemini's plain-English description of the last operation.
+- `jg.show_code() -> str`: Return the validated Python code from the last operation.
+- `jg.reset() -> None`: Clear conversation memory, cached LLM client, last code/response, and active model state.
+
+---
+
+### Pipeline & Contrib Helpers
+- `jax_gemini.pipeline`: `ModelBuilder`, `ModelTrainer`, `ModelEvaluator`, `ModelExporter`.
+- `jax_gemini.contrib`: `count_parameters`, `summarize_module`, `available_optimizers`, `create_optimizer`, `count_opt_steps`.
