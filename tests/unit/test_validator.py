@@ -117,3 +117,22 @@ class TestCodeValidator:
             "    return MLP(rngs)\n"
         )
         CodeValidator.validate(code, "build")
+
+    def test_allow_pickle_true_raises(self):
+        code = (
+            "import numpy as np\n"
+            "def load_data():\n"
+            "    return np.load('x.npy', allow_pickle=True)\n"
+        )
+        with pytest.raises(JaxGeminiValidationError, match="allow_pickle"):
+            CodeValidator.validate(code, "load_data")
+
+    def test_orbax_blocked_for_non_checkpoint_intent(self):
+        code = "import orbax.checkpoint as ocp\ndef build_model(rngs): pass"
+        with pytest.raises(JaxGeminiValidationError, match="orbax"):
+            CodeValidator.validate(code, "build")
+
+    def test_numpy_fromfile_blocked(self):
+        code = "import numpy as np\ndef load_data():\n    return np.fromfile('/etc/passwd')\n"
+        with pytest.raises(JaxGeminiValidationError, match="fromfile"):
+            CodeValidator.validate(code, "load_data")

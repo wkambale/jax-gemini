@@ -1,4 +1,5 @@
 import traceback
+from pathlib import Path
 from typing import Any
 
 from jax_gemini.codegen.validator import CodeValidator
@@ -32,6 +33,7 @@ class SandboxExecutor:
         code: str,
         intent: str,
         args: dict[str, Any] | None = None,
+        allowed_dirs: tuple[Path | str, ...] | None = None,
     ) -> Any:
         """
         Execute validated code in a restricted namespace.
@@ -40,6 +42,7 @@ class SandboxExecutor:
             code: Python source code string (already AST-validated)
             intent: Operation intent for function name lookup
             args: Runtime arguments to pass to the generated function
+            allowed_dirs: Directories to which sandbox file I/O is confined
 
         Returns:
             Whatever the generated function returns
@@ -49,7 +52,7 @@ class SandboxExecutor:
             JaxGeminiExecutionError: If execution fails
         """
         CodeValidator.validate(code, intent)
-        namespace = get_execution_namespace()
+        namespace = get_execution_namespace(intent=intent, allowed_dirs=allowed_dirs)
         fn_name = INTENT_FUNCTION_MAP.get(intent, "")
         if not fn_name:
             raise JaxGeminiExecutionError(f"Unknown intent: {intent}")

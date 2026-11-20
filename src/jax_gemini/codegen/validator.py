@@ -17,6 +17,34 @@ WHITELIST_IMPORTS: frozenset[str] = frozenset(
     }
 )
 
+_CORE_ML_IMPORTS: frozenset[str] = frozenset(
+    {"jax", "flax", "optax", "numpy", "functools", "math", "typing", "dataclasses"}
+)
+
+INTENT_ALLOWED_IMPORTS: dict[str, frozenset[str]] = {
+    "build": _CORE_ML_IMPORTS,
+    "train": _CORE_ML_IMPORTS,
+    "evaluate": _CORE_ML_IMPORTS,
+    "save": _CORE_ML_IMPORTS | {"orbax"},
+    "load": _CORE_ML_IMPORTS | {"orbax"},
+    "load_data": _CORE_ML_IMPORTS,
+    "preprocess_data": _CORE_ML_IMPORTS,
+    "analyze_data": _CORE_ML_IMPORTS,
+    "visualize_data": _CORE_ML_IMPORTS | {"matplotlib"},
+}
+
+BANNED_NUMPY_ATTRIBUTES: frozenset[str] = frozenset(
+    {
+        "fromfile",
+        "memmap",
+        "DataSource",
+        "ctypeslib",
+        "f2py",
+        "distutils",
+        "testing",
+    }
+)
+
 BANNED_BUILTINS: frozenset[str] = frozenset(
     {
         "eval",
@@ -188,20 +216,26 @@ class CodeValidator:
                 code=code,
             )
 
-        # 3. Top-level structure check (block arbitrary top-level execution side effects)
+        # 3. Intent check (fail closed on unknown intents)
+        required_fn = REQUIRED_FUNCTION_NAMES.get(intent)
+        if not required_fn:
+            raise JaxGeminiValidationError(f"Unknown intent: '{intent}'", code=code)
+        allowed_imports = INTENT_ALLOWED_IMPORTS.get(intent, WHITELIST_IMPORTS)
+
+        # 4. Top-level structure check (block arbitrary top-level execution side effects)
         for stmt in tree.body:
             _validate_top_level_statement(stmt, code)
 
-        # 4. Walk AST and check every node
+        # 5. Walk AST and check every node
         for node in nodes:
             # Import validation
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     root = alias.name.split(".")[0]
-                    if root not in WHITELIST_IMPORTS:
+                    if root not in allowed_imports:
                         raise JaxGeminiValidationError(
-                            f"Import '{alias.name}' is not in the allowed list. "
-                            f"Allowed: {sorted(WHITELIST_IMPORTS)}",
+                            f"Import '{alias.name}' is not allowed for intent '{intent}'. "
+                            f"Allowed: {sorted(allowed_imports)}",
                             code=code,
                         )
 
@@ -212,9 +246,10 @@ class CodeValidator:
                         code=code,
                     )
                 root = node.module.split(".")[0]
-                if root not in WHITELIST_IMPORTS:
+                if root not in allowed_imports:
                     raise JaxGeminiValidationError(
-                        f"Import from '{node.module}' is not allowed.", code=code
+                        f"Import from '{node.module}' is not allowed for intent '{intent}'.",
+                        code=code,
                     )
 
             # Banned builtin/name references (blocks both direct calls and aliasing)
@@ -223,28 +258,33 @@ class CodeValidator:
                     f"Use of '{node.id}' is not allowed in generated code.", code=code
                 )
 
-            # Banned call checks (belt-and-suspenders)
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-                if node.func.id in BANNED_BUILTINS:
+            # Banned call checks (belt-and-suspenders + pickle deserialization block)
+            if isinstance(node, ast.Call):
+                if isinstance(node.func, ast.Name) and node.func.id in BANNED_BUILTINS:
                     raise JaxGeminiValidationError(
                         f"Call to '{node.func.id}' is not allowed in generated code.", code=code
                     )
+                for kw in node.keywords:
+                    if kw.arg == "allow_pickle" and not (
+                        isinstance(kw.value, ast.Constant) and kw.value.value is False
+                    ):
+                        raise JaxGeminiValidationError(
+                            "allow_pickle=True is not allowed in generated code.", code=code
+                        )
 
             # Banned attribute access (explicit blocklist + unapproved dunder attributes)
             if isinstance(node, ast.Attribute):
                 is_dunder = node.attr.startswith("__") and node.attr.endswith("__")
-                if node.attr in BANNED_ATTRIBUTES or (
-                    is_dunder and node.attr not in ALLOWED_DUNDER_ATTRIBUTES
+                if (
+                    node.attr in BANNED_ATTRIBUTES
+                    or node.attr in BANNED_NUMPY_ATTRIBUTES
+                    or (is_dunder and node.attr not in ALLOWED_DUNDER_ATTRIBUTES)
                 ):
                     raise JaxGeminiValidationError(
                         f"Access to attribute '{node.attr}' is not allowed.", code=code
                     )
 
-        # 5. Required function check (fail closed on unknown intents)
-        required_fn = REQUIRED_FUNCTION_NAMES.get(intent)
-        if not required_fn:
-            raise JaxGeminiValidationError(f"Unknown intent: '{intent}'", code=code)
-
+        # 6. Required function check
         defined_functions = {
             node.name for node in tree.body if isinstance(node, ast.FunctionDef)
         }
