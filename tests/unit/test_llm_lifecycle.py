@@ -71,6 +71,8 @@ class TestLLMCredentialLifecycle:
 
         agent = jg.JaxGemini(jg.JaxGeminiConfig(gemini_api_key="key-1"))
         agent.build("m1")
-        agent.config.set({"max_retries": 99})
+        with pytest.raises(JaxGeminiConfigError, match="max_retries"):
+            agent.config.set({"max_retries": 99})
+        agent.config.max_retries = 99
         with pytest.raises(JaxGeminiConfigError, match="max_retries"):
             agent.build("m2")
