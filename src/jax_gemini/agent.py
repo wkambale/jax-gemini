@@ -1,3 +1,4 @@
+import copy
 import os
 from pathlib import Path
 from typing import Any, cast
@@ -11,12 +12,34 @@ from jax_gemini.config import JaxGeminiConfig
 from jax_gemini.exceptions import (
     JaxGeminiCheckpointError,
     JaxGeminiExecutionError,
+    JaxGeminiLLMError,
     JaxGeminiValidationError,
 )
 from jax_gemini.llm.gemini import GeminiLLM
 from jax_gemini.memory.conversation import ConversationMemory
 from jax_gemini.prompts.context_builder import ContextBuilder
 from jax_gemini.sandbox.executor import SandboxExecutor
+
+
+def _snapshot_runtime_args(runtime_args: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Create an isolated copy of mutable runtime_args so failed retries do not mutate state."""
+    if runtime_args is None:
+        return None
+    snapshot: dict[str, Any] = {}
+    for key, val in runtime_args.items():
+        try:
+            snapshot[key] = copy.deepcopy(val)
+        except Exception:
+            snapshot[key] = val
+    return snapshot
+
+
+def _sanitize_validation_feedback(err: JaxGeminiValidationError) -> str:
+    """Avoid exposing detailed AST security policy internals as an interactive bypass oracle."""
+    msg = str(err)
+    if "syntax error" in msg.lower() or "must define a top-level function" in msg.lower():
+        return msg
+    return "Generated code violated sandbox validation rules; use only allowed ML operations."
 
 
 class JaxGemini:
@@ -57,17 +80,19 @@ class JaxGemini:
         )
         schema = ContextBuilder.get_schema(intent)
         last_error: Exception | None = None
+        last_feedback: str = ""
         last_code: str = ""
 
         for attempt in range(1, self.config.max_retries + 1):
             self._log(f"Attempt {attempt}/{self.config.max_retries} for intent '{intent}'...")
 
-            if attempt > 1 and last_code and last_error:
+            if attempt > 1 and last_error is not None:
                 fix_prompt = CodeFixer.build_fix_prompt(
                     original_prompt=user_prompt,
                     failed_code=last_code,
-                    error_message=str(last_error),
+                    error_message=last_feedback or str(last_error),
                     attempt=attempt,
+                    intent=intent,
                 )
                 context = ContextBuilder.build(
                     intent=intent,
@@ -85,10 +110,11 @@ class JaxGemini:
                     if intent in ("save", "load")
                     else (Path.cwd(), Path(self.config.checkpoint_dir))
                 )
+                attempt_args = _snapshot_runtime_args(runtime_args)
                 result = self._executor.run(
                     code,
                     intent,
-                    runtime_args,
+                    attempt_args,
                     allowed_dirs=allowed_dirs,
                     timeout_seconds=self.config.timeout_seconds,
                 )
@@ -107,12 +133,37 @@ class JaxGemini:
                 self._log(f"Attempt {attempt} succeeded.")
                 return result
 
-            except (JaxGeminiValidationError, JaxGeminiExecutionError) as e:
+            except JaxGeminiValidationError as e:
                 last_error = e
+                last_feedback = _sanitize_validation_feedback(e)
                 last_code = getattr(e, "code", "")
-                self._log(f"Attempt {attempt} failed: {e}")
+                self._log(f"Attempt {attempt} failed validation: {e}")
                 if attempt < self.config.max_retries:
-                    self._log("Sending error context to Gemini for correction...")
+                    self._log("Sending sanitized validation context to Gemini for correction...")
+
+            except JaxGeminiExecutionError as e:
+                last_error = e
+                last_feedback = str(e)
+                last_code = getattr(e, "code", "")
+                self._log(f"Attempt {attempt} failed execution: {e}")
+                if attempt < self.config.max_retries:
+                    self._log("Sending sanitized error context to Gemini for correction...")
+
+            except JaxGeminiLLMError as e:
+                last_error = e
+                last_feedback = (
+                    "Previous response was malformed or failed to parse as valid JSON; "
+                    "respond strictly with the requested JSON schema."
+                )
+                last_code = ""
+                self._log(f"Attempt {attempt} failed LLM response parsing: {e}")
+                if attempt < self.config.max_retries:
+                    self._log("Retrying Gemini generation...")
+
+        if isinstance(last_error, JaxGeminiLLMError):
+            raise last_error
+        if isinstance(last_error, JaxGeminiValidationError):
+            raise last_error
 
         raise JaxGeminiExecutionError(
             f"All {self.config.max_retries} attempts failed for '{user_prompt}'.\n"
