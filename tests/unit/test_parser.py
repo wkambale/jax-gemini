@@ -23,3 +23,8 @@ class TestParser:
         response = {"code": 123, "intent": "build"}
         with pytest.raises(JaxGeminiLLMError, match="must be a string"):
             CodeParser.extract(response, "build")
+
+    def test_mismatched_intent_raises(self):
+        response = {"code": "def train_model(): pass", "intent": "train"}
+        with pytest.raises(JaxGeminiLLMError, match="does not match"):
+            CodeParser.extract(response, "build")

@@ -20,9 +20,30 @@ except ImportError:
     _matplotlib_available = False
 
 import builtins
+from collections.abc import Mapping, Sequence
+from types import ModuleType
 from typing import Any
 
-SAFE_BUILTINS = {
+from jax_gemini.codegen.validator import WHITELIST_IMPORTS
+
+
+def _safe_import(
+    name: str,
+    globals: Mapping[str, object] | None = None,
+    locals: Mapping[str, object] | None = None,
+    fromlist: Sequence[str] = (),
+    level: int = 0,
+) -> ModuleType:
+    """Restricted __import__ enforcing WHITELIST_IMPORTS and disallowing relative imports."""
+    if level != 0:
+        raise ImportError("Relative imports are not allowed.")
+    root = name.split(".")[0]
+    if root not in WHITELIST_IMPORTS:
+        raise ImportError(f"Import '{name}' is not allowed.")
+    return builtins.__import__(name, globals, locals, fromlist, level)
+
+
+SAFE_BUILTINS: dict[str, Any] = {
     name: getattr(builtins, name, None)
     for name in [
         "print",
@@ -49,13 +70,11 @@ SAFE_BUILTINS = {
         "set",
         "isinstance",
         "hasattr",
-        "getattr",
-        "type",
         "repr",
         "True",
         "False",
         "None",
-        "__import__",
+        "__build_class__",
         "Exception",
         "ValueError",
         "TypeError",
@@ -64,6 +83,7 @@ SAFE_BUILTINS = {
     ]
     if getattr(builtins, name, None) is not None
 }
+SAFE_BUILTINS["__import__"] = _safe_import
 
 BASE_NAMESPACE: dict[str, Any] = {
     "jax": jax,
@@ -72,6 +92,7 @@ BASE_NAMESPACE: dict[str, Any] = {
     "nnx": nnx,
     "optax": optax,
     "np": np,
+    "__name__": "jax_gemini_sandbox",
     "__builtins__": SAFE_BUILTINS,
 }
 

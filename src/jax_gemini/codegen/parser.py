@@ -19,9 +19,20 @@ class CodeParser:
         Raises:
             JaxGeminiLLMError: If 'code' field is missing or empty
         """
+        if not isinstance(response, dict):
+            raise JaxGeminiLLMError(
+                "Gemini response must be a JSON object.",
+                raw_response=str(response),
+            )
         if "code" not in response:
             raise JaxGeminiLLMError(
                 f"Gemini response missing 'code' field. Got fields: {list(response.keys())}",
+                raw_response=str(response),
+            )
+        response_intent = response.get("intent")
+        if isinstance(response_intent, str) and response_intent and response_intent != intent:
+            raise JaxGeminiLLMError(
+                f"Gemini response intent '{response_intent}' does not match '{intent}'.",
                 raw_response=str(response),
             )
         raw_code = response["code"]
