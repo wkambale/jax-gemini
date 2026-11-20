@@ -49,7 +49,8 @@ __all__ = [
     "visualize_data",
 ]
 
-# Module-level singleton for simple usage pattern (jg.build, jg.train, etc.)
+# Module-level singleton for single-session interactive usage (jg.build, jg.train, etc.).
+# Multi-user or concurrent callers must instantiate separate JaxGemini() instances.
 _default_agent = JaxGemini()
 config = _default_agent.config
 build = _default_agent.build
