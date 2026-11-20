@@ -1,9 +1,11 @@
+from typing import Any
+
 from jax_gemini.exceptions import JaxGeminiLLMError
 
 
 class CodeParser:
     @staticmethod
-    def extract(response: dict, intent: str) -> str:
+    def extract(response: dict[str, Any], intent: str) -> str:
         """
         Extract the 'code' field from a structured Gemini response.
 
@@ -22,7 +24,13 @@ class CodeParser:
                 f"Gemini response missing 'code' field. Got fields: {list(response.keys())}",
                 raw_response=str(response),
             )
-        code = response["code"].strip()
+        raw_code = response["code"]
+        if not isinstance(raw_code, str):
+            raise JaxGeminiLLMError(
+                "Gemini response 'code' field must be a string.",
+                raw_response=str(response),
+            )
+        code = raw_code.strip()
         if not code:
             raise JaxGeminiLLMError("Gemini returned an empty code block.")
         return code

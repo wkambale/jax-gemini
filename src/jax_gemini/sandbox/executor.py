@@ -16,7 +16,7 @@ INTENT_FUNCTION_MAP: dict[str, str] = {
     "visualize_data": "visualize_data",
 }
 
-INTENT_DEFAULT_ARGS: dict[str, dict] = {
+INTENT_DEFAULT_ARGS: dict[str, dict[str, Any]] = {
     "build": {},
     "train": {"dataset": None, "epochs": 5, "learning_rate": 1e-3},
     "evaluate": {"dataset": None},
@@ -30,7 +30,7 @@ class SandboxExecutor:
         self,
         code: str,
         intent: str,
-        args: dict | None = None,
+        args: dict[str, Any] | None = None,
     ) -> Any:
         """
         Execute validated code in a restricted namespace.

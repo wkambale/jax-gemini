@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -12,7 +13,7 @@ class JaxGeminiConfig:
     checkpoint_dir: str = "./jax_gemini_checkpoints"
     timeout_seconds: int = 60
 
-    def set(self, updates: dict) -> None:
+    def set(self, updates: dict[str, Any]) -> None:
         """Update config from a dict. Used as jg.config.set({...})."""
         from jax_gemini.exceptions import JaxGeminiConfigError
 
