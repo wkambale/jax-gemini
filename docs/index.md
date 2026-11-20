@@ -30,9 +30,9 @@ hide:
 </section>
 
 <div class="jf-badges">
-  <a href="https://pypi.org/project/jaxforge/0.2.0/"><img src="https://img.shields.io/pypi/v/jaxforge.svg" alt="PyPI version"></a>
-  <a href="https://pypi.org/project/jaxforge/0.2.0/"><img src="https://img.shields.io/pypi/pyversions/jaxforge.svg" alt="Python Versions"></a>
-  <a href="https://github.com/wkambale/jaxforge/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License"></a>
+  <a href="https://pypi.org/project/jaxforge/"><img src="https://img.shields.io/pypi/v/jaxforge" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/jaxforge/"><img src="https://img.shields.io/pypi/pyversions/jaxforge" alt="Python Versions"></a>
+  <a href="https://github.com/wkambale/jaxforge/blob/main/LICENSE"><img src="https://img.shields.io/github/license/wkambale/jaxforge" alt="License"></a>
   <a href="https://github.com/wkambale/jaxforge/actions/workflows/ci.yml"><img src="https://github.com/wkambale/jaxforge/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </div>
 
