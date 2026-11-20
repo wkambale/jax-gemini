@@ -95,3 +95,24 @@ class TestSandboxExecutor:
         )
         with pytest.raises(JaxGeminiExecutionError, match="Pickle deserialization"):
             self.executor.run(pickle_pos_code, "load_data", allowed_dirs=(sandbox_dir,))
+
+    def test_module_proxies_are_read_only_and_builtins_isolated(self):
+        from jax_gemini.sandbox.namespace import get_execution_namespace
+
+        poison_code = (
+            "import flax.nnx as nnx\n"
+            "def build_model(rngs):\n"
+            "    nnx.POISON = 'bad'\n"
+            "    return 1\n"
+        )
+        with pytest.raises(JaxGeminiExecutionError, match="read-only"):
+            self.executor.run(poison_code, "build", {"rngs": None})
+
+        ns1 = get_execution_namespace()
+        ns2 = get_execution_namespace()
+        assert ns1["__builtins__"] is not ns2["__builtins__"]
+        ns1["__builtins__"]["MARKER"] = "leaked"
+        assert "MARKER" not in ns2["__builtins__"]
+        assert "MARKER" not in SAFE_BUILTINS
+        with pytest.raises(TypeError):
+            SAFE_BUILTINS["MARKER"] = "fail"  # type: ignore[index]
