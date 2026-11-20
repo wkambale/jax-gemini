@@ -1,8 +1,11 @@
 site_name: Jax Forge
 site_description: Model-agnostic natural language engineering workbench for JAX and Flax
-site_url: https://wkambale.github.io/jaxforge
+site_url: https://wkambale.github.io/jaxforge/
 repo_url: https://github.com/wkambale/jaxforge
 repo_name: wkambale/jaxforge
+copyright: Copyright &copy; 2026 Wesley Kambale
+docs_dir: docs
+site_dir: site
 edit_uri: edit/main/docs/
 
 theme:
@@ -10,15 +13,26 @@ theme:
   font:
     text: Inter
     code: JetBrains Mono
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
   features:
-    - navigation.top
+    - navigation.instant
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
-    - content.code.copy
+    - navigation.footer
+    - navigation.top
     - search.suggest
     - search.highlight
+    - content.code.copy
 
 extra_css:
   - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/scroll.js
 
 plugins:
   - search
@@ -31,13 +45,29 @@ markdown_extensions:
   - admonition
   - attr_list
   - md_in_html
+  - tables
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
 
 nav:
   - Home: index.md
-  - Quickstart guide: quickstart.md
+  - Quickstart: quickstart.md
+  - LLM providers: providers.md
+  - Core workflows:
+      - Preview and diffs: preview-and-diffs.md
+      - Training and exploration: training-and-exploration.md
+      - Export and checkpoints: export-and-checkpoints.md
+  - Execution backends: backends.md
+  - Distributed sharding: sharding.md
+  - Async support: async.md
+  - CLI and MCP server: cli-and-mcp.md
   - API reference: api-reference.md
   - Architecture internals: architecture.md
   - Security protocol: security.md
+  - Changelog: changelog.md
+  - Contributing: contributing.md

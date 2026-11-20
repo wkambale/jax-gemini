@@ -90,10 +90,18 @@ See [examples/](examples/) for end-to-end Python scripts and notebooks.
 
 ## Documentation
 
-Full hosted documentation is published at [wkambale.github.io/jaxforge](https://wkambale.github.io/jaxforge):
+Full hosted documentation is published at [wkambale.github.io/jaxforge](https://wkambale.github.io/jaxforge/):
 
-- [Quickstart guide](docs/quickstart.md): Installation, provider configuration, preview gates, training, and project export.
-- [API reference](docs/api-reference.md): Public functions, `GeneratedPlan`, execution backends, CLI, and contrib helpers.
+- [Quickstart guide](docs/quickstart.md): Installation, provider configuration, preview gates, training, and export.
+- [LLM providers](docs/providers.md): Google Gemini, OpenAI, Anthropic Claude, OpenRouter, Ollama, and routing.
+- [Preview and diffs](docs/preview-and-diffs.md): Inspect-first execution, `approve` callbacks, diffs, and `DatasetProfile`.
+- [Training and exploration](docs/training-and-exploration.md): Single-shot training, `explore()` trial search, and shape checks.
+- [Export and checkpoints](docs/export-and-checkpoints.md): Standalone project export, Orbax persistence, and Safetensors loading.
+- [Execution backends](docs/backends.md): Thread, subprocess resource limits, Docker, E2B, and Modal isolation.
+- [Distributed sharding](docs/sharding.md): Device discovery, meshes, and `NamedSharding` rules.
+- [Asynchronous support](docs/async.md): Non-blocking session wrappers (`apreview`, `abuild`, `atrain`, `aevaluate`).
+- [CLI and MCP server](docs/cli-and-mcp.md): Terminal commands and Model Context Protocol tool integration.
+- [API reference](docs/api-reference.md): Public functions, `GeneratedPlan`, execution backends, and contrib helpers.
 - [Architecture internals](docs/architecture.md): Multi-provider routing, AST validation, sandbox backends, and memory.
 - [Security protocol](docs/security.md): AST rules, import scoping, runtime proxies, path confinement, and timeout enforcement.
 
