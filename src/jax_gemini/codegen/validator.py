@@ -42,8 +42,34 @@ BANNED_NUMPY_ATTRIBUTES: frozenset[str] = frozenset(
         "f2py",
         "distutils",
         "testing",
+        "lib",
     }
 )
+
+BANNED_MODULE_PREFIXES: frozenset[str] = frozenset(
+    {
+        "numpy.ctypeslib",
+        "numpy.f2py",
+        "numpy.distutils",
+        "numpy.testing",
+        "numpy.lib",
+        "numpy.compat",
+        "flax.io",
+        "flax.training.checkpoints",
+        "orbax.checkpoint.test_utils",
+        "matplotlib._api",
+        "matplotlib.backend_bases",
+        "matplotlib.backends",
+    }
+)
+
+
+def is_banned_module_path(module_path: str) -> bool:
+    """Return True if a dotted module path or any parent matches BANNED_MODULE_PREFIXES."""
+    return any(
+        module_path == prefix or module_path.startswith(f"{prefix}.")
+        for prefix in BANNED_MODULE_PREFIXES
+    )
 
 BANNED_BUILTINS: frozenset[str] = frozenset(
     {
@@ -118,6 +144,14 @@ BANNED_ATTRIBUTES: frozenset[str] = frozenset(
         "im_func",
         "im_self",
         "im_class",
+        "__self__",
+        "__func__",
+        "format",
+        "format_map",
+        "_target",
+        "_overrides",
+        "_blocked",
+        "_inner",
     }
 )
 
@@ -238,6 +272,15 @@ class CodeValidator:
                             f"Allowed: {sorted(allowed_imports)}",
                             code=code,
                         )
+                    if is_banned_module_path(alias.name) or any(
+                        part in BANNED_ATTRIBUTES
+                        or (root == "numpy" and part in BANNED_NUMPY_ATTRIBUTES)
+                        for part in alias.name.split(".")[1:]
+                    ):
+                        raise JaxGeminiValidationError(
+                            f"Import '{alias.name}' is not allowed for intent '{intent}'.",
+                            code=code,
+                        )
 
             if isinstance(node, ast.ImportFrom):
                 if node.level > 0 or not node.module:
@@ -251,6 +294,28 @@ class CodeValidator:
                         f"Import from '{node.module}' is not allowed for intent '{intent}'.",
                         code=code,
                     )
+                if is_banned_module_path(node.module) or any(
+                    part in BANNED_ATTRIBUTES
+                    or (root == "numpy" and part in BANNED_NUMPY_ATTRIBUTES)
+                    for part in node.module.split(".")[1:]
+                ):
+                    raise JaxGeminiValidationError(
+                        f"Import from '{node.module}' is not allowed for intent '{intent}'.",
+                        code=code,
+                    )
+                for alias in node.names:
+                    imported = alias.name
+                    if (
+                        imported == "*"
+                        or is_banned_module_path(f"{node.module}.{imported}")
+                        or imported in BANNED_ATTRIBUTES
+                        or imported in BANNED_NAMES
+                        or (root == "numpy" and imported in BANNED_NUMPY_ATTRIBUTES)
+                    ):
+                        raise JaxGeminiValidationError(
+                            f"Import of '{imported}' from '{node.module}' is not allowed.",
+                            code=code,
+                        )
 
             # Banned builtin/name references (blocks both direct calls and aliasing)
             if isinstance(node, ast.Name) and node.id in BANNED_NAMES:

@@ -136,3 +136,24 @@ class TestCodeValidator:
         code = "import numpy as np\ndef load_data():\n    return np.fromfile('/etc/passwd')\n"
         with pytest.raises(JaxGeminiValidationError, match="fromfile"):
             CodeValidator.validate(code, "load_data")
+
+    def test_submodule_import_from_and_wildcard_blocked(self):
+        for bad in (
+            "from numpy.ctypeslib import load_library\ndef load_data():\n    return None\n",
+            "from numpy.lib.npyio import load\ndef load_data():\n    return None\n",
+            "from flax.training.checkpoints import save_checkpoint\n"
+            "def build_model(rngs):\n    return None\n",
+            "from numpy import *\ndef load_data():\n    return None\n",
+            "from numpy import fromfile\ndef load_data():\n    return None\n",
+        ):
+            with pytest.raises(JaxGeminiValidationError):
+                CodeValidator.validate(bad, "load_data" if "load_data" in bad else "build")
+
+    def test_format_string_traversal_and_proxy_internals_blocked(self):
+        for bad in (
+            "import flax.nnx as nnx\n"
+            "def build_model(rngs):\n    return '{0.__globals__}'.format(nnx.Linear)\n",
+            "import numpy as np\ndef load_data():\n    return np._target.fromfile('/etc/passwd')\n",
+        ):
+            with pytest.raises(JaxGeminiValidationError):
+                CodeValidator.validate(bad, "load_data" if "load_data" in bad else "build")
