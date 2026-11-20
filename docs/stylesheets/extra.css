@@ -1,118 +1,602 @@
+/* Role-based semantic design tokens for Jax Forge documentation */
 :root {
-  /* Primary brand scale */
-  --jg-brand-50: #f0f5fa;
-  --jg-brand-100: #dce7f3;
-  --jg-brand-200: #b9cfe7;
-  --jg-brand-700: #1d4269;
-  --jg-brand-800: #14304d;
-  --jg-brand-900: #0c1f33;
-  --jg-brand-950: #071320;
+  /* Primary brand scale (deep JAX sapphire-navy) */
+  --jf-brand-50: #f0f5fa;
+  --jf-brand-100: #dce7f3;
+  --jf-brand-200: #b9cfe7;
+  --jf-brand-700: #1d4269;
+  --jf-brand-800: #14304d;
+  --jf-brand-900: #0c1f33;
+  --jf-brand-950: #071320;
 
-  /* Secondary accent scale */
-  --jg-accent-50: #fff4ec;
-  --jg-accent-300: #fdba8c;
-  --jg-accent-400: #fb923c;
-  --jg-accent-500: #ea580c;
+  /* Secondary accent scale (warm forge ember-orange) */
+  --jf-accent-50: #fff4ec;
+  --jf-accent-100: #ffe4d1;
+  --jf-accent-300: #fdba8c;
+  --jf-accent-400: #fb923c;
+  --jf-accent-500: #ea580c;
+  --jf-accent-700: #c2410c;
+  --jf-accent-800: #9a3412;
 
-  /* Neutral ink tokens */
-  --jg-ink: #0f1722;
-  --jg-ink-muted: #3e4c5e;
-  --jg-ink-soft: #5f6f82;
+  /* Neutral ink tokens (brand-tinted charcoal, never pure black) */
+  --jf-ink: #0f1722;
+  --jf-ink-muted: #3e4c5e;
+  --jf-ink-soft: #5f6f82;
 
   /* Surface and border tokens */
-  --jg-white: #ffffff;
-  --jg-sand: #faf8f4;
-  --jg-mist: #f3f6fa;
-  --jg-line: #dce3ec;
-  --jg-line-strong: #c2cddb;
+  --jf-white: #ffffff;
+  --jf-sand: #faf8f4;
+  --jf-mist: #f3f6fa;
+  --jf-line: #dce3ec;
+  --jf-line-strong: #c2cddb;
 
-  /* MkDocs Material role mappings */
-  --md-primary-fg-color: var(--jg-brand-800);
-  --md-primary-fg-color--light: var(--jg-brand-700);
-  --md-primary-fg-color--dark: var(--jg-brand-900);
-  --md-accent-fg-color: var(--jg-accent-500);
-  --md-default-fg-color: var(--jg-ink);
-  --md-default-fg-color--light: var(--jg-ink-muted);
-  --md-default-bg-color: var(--jg-white);
+  /* Radius tokens (no pill radii) */
+  --jf-radius-sm: 0.25rem;
+  --jf-radius-md: 0.5rem;
+  --jf-radius-lg: 0.75rem;
+
+  /* MkDocs Material semantic mappings */
+  --md-primary-fg-color: var(--jf-brand-800);
+  --md-primary-fg-color--light: var(--jf-brand-700);
+  --md-primary-fg-color--dark: var(--jf-brand-950);
+  --md-primary-bg-color: var(--jf-white);
+  --md-primary-bg-color--light: var(--jf-brand-50);
+  --md-accent-fg-color: var(--jf-accent-700);
+  --md-accent-fg-color--transparent: var(--jf-accent-100);
+  --md-accent-bg-color: var(--jf-brand-950);
+  --md-default-fg-color: var(--jf-ink);
+  --md-default-fg-color--light: var(--jf-ink-muted);
+  --md-default-fg-color--lighter: var(--jf-ink-soft);
+  --md-default-bg-color: var(--jf-white);
+  --md-code-bg-color: var(--jf-mist);
+  --md-code-fg-color: var(--jf-brand-800);
+  --md-footer-bg-color: var(--jf-brand-900);
+  --md-footer-bg-color--dark: var(--jf-brand-950);
+  --md-footer-fg-color: var(--jf-white);
+  --md-footer-fg-color--light: var(--jf-brand-200);
+  --md-footer-fg-color--lighter: var(--jf-ink-soft);
 }
 
+html {
+  scroll-behavior: auto;
+}
+
+body,
+input,
+button {
+  font-feature-settings: "cv11", "ss01";
+  color: var(--jf-ink);
+}
+
+/* Enforce sentence case globally (never force uppercase via CSS) */
+.md-header,
+.md-tabs,
+.md-nav,
+.md-typeset,
+.md-typeset th,
+.md-typeset .admonition-title,
+.md-button {
+  text-transform: none;
+}
+
+/* Header and navigation tabs */
 .md-header {
-  background-color: var(--jg-brand-800);
-  border-bottom: 1px solid var(--jg-brand-900);
+  background-color: var(--jf-brand-900);
+  border-bottom: 1px solid var(--jf-brand-700);
+  box-shadow: none;
 }
 
+.md-tabs {
+  background-color: var(--jf-brand-800);
+  border-bottom: 1px solid var(--jf-brand-700);
+}
+
+.md-tabs__link {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.md-tabs__link--active,
+.md-tabs__link:hover {
+  color: var(--jf-accent-400);
+  opacity: 1;
+}
+
+.md-search__form {
+  border-radius: var(--jf-radius-md);
+  background-color: var(--jf-brand-700);
+}
+
+/* Primary left sidebar refinement */
+.md-sidebar--primary .md-nav__title {
+  font-weight: 600;
+  color: var(--jf-ink);
+}
+
+.md-nav--primary .md-nav__item--active > .md-nav__link {
+  font-weight: 600;
+  color: var(--jf-accent-700);
+}
+
+.md-nav__link:focus-visible,
+.md-nav__link:hover {
+  color: var(--jf-accent-700);
+}
+
+/* Responsive typography scale and balanced wrapping */
 .md-typeset h1,
 .md-typeset h2,
 .md-typeset h3,
 .md-typeset h4 {
-  color: var(--jg-ink);
-  font-feature-settings: "cv11", "ss01";
+  color: var(--jf-ink);
   font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  text-transform: none;
   text-wrap: balance;
 }
 
-.md-typeset p {
-  color: var(--jg-ink-muted);
-  line-height: 1.65;
-  max-width: 65ch;
+.md-typeset h1 {
+  font-size: clamp(2rem, 1.5rem + 2vw, 2.75rem);
+  letter-spacing: -0.025em;
+  line-height: 1.12;
+  margin-bottom: 1rem;
+}
+
+.md-typeset h2 {
+  font-size: clamp(1.45rem, 1.25rem + 0.9vw, 1.875rem);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--jf-line);
+}
+
+.md-typeset h3 {
+  font-size: clamp(1.125rem, 1.05rem + 0.35vw, 1.3rem);
+  line-height: 1.3;
+  margin-top: 1.75rem;
+}
+
+.md-typeset p,
+.md-typeset li {
+  color: var(--jf-ink-muted);
+  line-height: 1.68;
   text-wrap: pretty;
 }
 
+.md-typeset > p {
+  max-width: 68ch;
+}
+
+.md-typeset strong {
+  color: var(--jf-ink);
+  font-weight: 600;
+}
+
+/* Tabular numerals for versions, dates, tables, and counters */
 .md-typeset table,
-.md-typeset code,
+.md-typeset .linenos,
 .md-nav__item {
-  font-feature-settings: "cv11", "ss01";
   font-variant-numeric: tabular-nums;
 }
 
-.md-typeset .admonition,
-.md-typeset pre > code,
+/* Links and focus states */
+.md-typeset a {
+  color: var(--jf-brand-700);
+  text-decoration-color: var(--jf-line-strong);
+  text-underline-offset: 0.2em;
+}
+
+.md-typeset a:hover,
+.md-typeset a:focus-visible {
+  color: var(--jf-accent-700);
+  text-decoration-color: var(--jf-accent-500);
+}
+
+/* Code blocks and inline code */
+.md-typeset code {
+  border-radius: var(--jf-radius-sm);
+  border: 1px solid var(--jf-line);
+  background-color: var(--jf-mist);
+  color: var(--jf-brand-800);
+  font-size: 0.85em;
+  padding: 0.1em 0.35em;
+}
+
+.md-typeset pre > code {
+  border: 1px solid var(--jf-line);
+  border-radius: var(--jf-radius-md);
+  background-color: var(--jf-mist);
+}
+
+.md-typeset .highlighttable,
+.md-typeset .highlight pre {
+  border-radius: var(--jf-radius-md);
+}
+
+.md-clipboard {
+  border-radius: var(--jf-radius-sm);
+}
+
+/* Tables with crisp hairlines and subtle sand headers */
 .md-typeset table:not([class]) {
-  border: 1px solid var(--jg-line);
-  border-radius: 0.5rem;
-}
-
-.jg-meta {
-  border-bottom: 1px solid var(--jg-line);
-  color: var(--jg-ink-soft);
+  border: 1px solid var(--jf-line);
+  border-radius: var(--jf-radius-md);
+  box-shadow: none;
   font-size: 0.875rem;
-  font-variant-numeric: tabular-nums;
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.75rem;
 }
 
-.jg-grid {
+.md-typeset table:not([class]) th {
+  background-color: var(--jf-sand);
+  color: var(--jf-ink);
+  font-weight: 600;
+  border-bottom: 1px solid var(--jf-line-strong);
+}
+
+.md-typeset table:not([class]) td {
+  border-top: 1px solid var(--jf-line);
+  color: var(--jf-ink-muted);
+}
+
+/* Admonitions and tabs */
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: var(--jf-radius-md);
+  border-color: var(--jf-line-strong);
+  background-color: var(--jf-sand);
+  box-shadow: none;
+}
+
+.md-typeset .tabbed-labels > label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.md-button {
+  border-radius: var(--jf-radius-md);
+  font-weight: 600;
+}
+
+/* Mobile touch targets minimum 44px */
+@media screen and (max-width: 76.2344em) {
+  .md-nav__link {
+    min-height: 2.75rem;
+    align-items: center;
+  }
+}
+
+/* ==========================================================================
+   Homepage architectural sections (role-based surfaces, aligned card grids)
+   ========================================================================== */
+
+.jf-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.jf-badges img {
+  display: block;
+}
+
+.jf-hero {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--jf-brand-800);
+  color: var(--jf-white);
+  border-radius: var(--jf-radius-lg);
+  padding: 2.5rem 2.25rem 3.25rem;
+  margin-bottom: 2rem;
+}
+
+.jf-hero__rings {
+  position: absolute;
+  top: -2rem;
+  right: -2rem;
+  width: 15rem;
+  height: 15rem;
+  pointer-events: none;
+}
+
+.jf-hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--jf-accent-400);
+  margin-bottom: 0.875rem;
+}
+
+.jf-hero__eyebrow-line {
+  display: inline-block;
+  width: 1.5rem;
+  height: 0.125rem;
+  background-color: var(--jf-accent-400);
+}
+
+.md-typeset .jf-hero__title {
+  color: var(--jf-white);
+  font-size: clamp(1.9rem, 1.5rem + 1.6vw, 2.65rem);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  margin: 0 0 1rem;
+  border: 0;
+  padding: 0;
+  max-width: 24ch;
+}
+
+.md-typeset .jf-hero__lead {
+  color: var(--jf-brand-100);
+  font-size: 1rem;
+  line-height: 1.65;
+  max-width: 58ch;
+  margin: 0 0 1.5rem;
+}
+
+.jf-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.md-typeset .jf-btn-primary,
+.md-typeset .jf-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--jf-radius-md);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.md-typeset .jf-btn-primary {
+  background-color: var(--jf-accent-500);
+  color: var(--jf-white);
+  border: 1px solid var(--jf-accent-500);
+}
+
+.md-typeset .jf-btn-primary:hover,
+.md-typeset .jf-btn-primary:focus-visible {
+  background-color: var(--jf-accent-400);
+  color: var(--jf-brand-950);
+  border-color: var(--jf-accent-400);
+}
+
+.md-typeset .jf-btn-secondary {
+  background-color: transparent;
+  color: var(--jf-white);
+  border: 1px solid var(--jf-brand-200);
+}
+
+.md-typeset .jf-btn-secondary:hover,
+.md-typeset .jf-btn-secondary:focus-visible {
+  background-color: var(--jf-brand-700);
+  color: var(--jf-white);
+}
+
+.jf-hero__chevron {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 18px;
+  pointer-events: none;
+}
+
+/* Alternating surface bands */
+.jf-band {
+  border-radius: var(--jf-radius-lg);
+  padding: 1.75rem;
+  margin: 1.75rem 0;
+  border: 1px solid var(--jf-line);
+}
+
+.jf-band--sand {
+  background-color: var(--jf-sand);
+}
+
+.jf-band--mist {
+  background-color: var(--jf-mist);
+}
+
+.jf-band__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--jf-accent-700);
+  margin-bottom: 0.5rem;
+}
+
+.jf-band__eyebrow-line {
+  display: inline-block;
+  width: 1.5rem;
+  height: 0.125rem;
+  background-color: var(--jf-accent-500);
+}
+
+.md-typeset .jf-band h2 {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+/* Uniform peer card grids */
+.jf-card-grid {
   display: grid;
-  gap: 1.25rem;
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1.25rem;
   margin: 1.5rem 0;
 }
 
-.jg-card {
-  background-color: var(--jg-sand);
-  border: 1px solid var(--jg-line);
-  border-radius: 0.75rem;
+.jf-card {
   display: flex;
   flex-direction: column;
-  padding: 1.25rem;
+  background-color: var(--jf-white);
+  border: 1px solid var(--jf-line);
+  border-radius: var(--jf-radius-lg);
+  padding: 1.25rem 1.35rem;
 }
 
-.jg-card h3 {
-  border-top: 1px solid var(--jg-line-strong);
-  margin: 0.5rem 0 0.5rem;
-  padding-top: 0.75rem;
-}
-
-.jg-card p {
-  font-size: 0.925rem;
-  margin: 0 0 1rem;
-}
-
-.jg-card-link {
-  font-size: 0.875rem;
+.jf-card__eyebrow {
+  font-size: 0.75rem;
   font-weight: 600;
+  color: var(--jf-accent-700);
+  margin: 0;
+}
+
+.jf-card__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  margin-top: 0.875rem;
+  border-top: 1px solid var(--jf-line);
+  padding-top: 0.875rem;
+}
+
+.md-typeset .jf-card__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--jf-ink);
+}
+
+.md-typeset .jf-card__text {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--jf-ink-muted);
+}
+
+.md-typeset .jf-card__link {
   margin-top: auto;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--jf-brand-700);
+  text-decoration: none;
+}
+
+.md-typeset .jf-card__link:hover {
+  color: var(--jf-accent-700);
+  text-decoration: underline;
+}
+
+/* Dual editorial spotlight strip */
+.jf-spotlight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1.25rem;
+  margin: 1.5rem 0;
+}
+
+.jf-spotlight {
+  border-radius: var(--jf-radius-lg);
+  padding: 1.5rem;
+}
+
+.jf-spotlight--accent {
+  background-color: var(--jf-accent-500);
+  color: var(--jf-white);
+}
+
+.jf-spotlight--brand {
+  background-color: var(--jf-brand-700);
+  color: var(--jf-white);
+}
+
+.md-typeset .jf-spotlight h3 {
+  margin: 0 0 0.5rem;
+  color: inherit;
+}
+
+.md-typeset .jf-spotlight--accent p {
+  margin: 0;
+  color: var(--jf-accent-50);
+  font-size: 0.9rem;
+}
+
+.md-typeset .jf-spotlight--brand p {
+  margin: 0;
+  color: var(--jf-brand-100);
+  font-size: 0.9rem;
+}
+
+.md-typeset .jf-spotlight code {
+  background-color: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: inherit;
+}
+
+/* Directory list grid inside bottom band */
+.jf-directory {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.5rem 1.5rem;
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+
+.md-typeset .jf-directory li {
+  margin: 0;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--jf-line);
+}
+
+.md-typeset .jf-directory a {
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.md-typeset .jf-directory a:hover {
+  text-decoration: underline;
+}
+
+/* Icon-only scroll-to-top button (44x44px) */
+.jf-scroll-top {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--jf-radius-md);
+  border: 1px solid var(--jf-brand-700);
+  background-color: var(--jf-brand-800);
+  color: var(--jf-white);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.5rem);
+  transition: opacity 180ms ease, transform 180ms ease, background-color 150ms ease;
+}
+
+.jf-scroll-top.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.jf-scroll-top:hover,
+.jf-scroll-top:focus-visible {
+  background-color: var(--jf-brand-700);
+  color: var(--jf-accent-400);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jf-scroll-top {
+    transition: none;
+  }
 }
