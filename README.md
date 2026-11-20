@@ -2,9 +2,9 @@
   <h1>Jax Forge</h1>
   <p><b>Model-agnostic natural language engineering workbench for JAX and Flax</b></p>
 
-  [![PyPI version](https://img.shields.io/pypi/v/jaxforge.svg)](https://pypi.org/project/jaxforge/)
-  [![Python Versions](https://img.shields.io/pypi/pyversions/jaxforge.svg)](https://pypi.org/project/jaxforge/)
-  [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+  [![PyPI version](https://img.shields.io/pypi/v/jaxforge)](https://pypi.org/project/jaxforge/)
+  [![Python Versions](https://img.shields.io/pypi/pyversions/jaxforge)](https://pypi.org/project/jaxforge/)
+  [![License](https://img.shields.io/github/license/wkambale/jaxforge)](LICENSE)
   [![CI](https://github.com/wkambale/jaxforge/actions/workflows/ci.yml/badge.svg)](https://github.com/wkambale/jaxforge/actions/workflows/ci.yml)
 </div>
 
