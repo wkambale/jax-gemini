@@ -1,10 +1,8 @@
-import signal
 import sys
 import threading
 import time
 import traceback
-from collections.abc import Iterator
-from contextlib import contextmanager
+from collections.abc import Callable
 from pathlib import Path
 from types import FrameType
 from typing import Any
@@ -34,44 +32,41 @@ INTENT_DEFAULT_ARGS: dict[str, dict[str, Any]] = {
 }
 
 
-@contextmanager
-def _execution_timeout(timeout_seconds: float) -> Iterator[None]:
-    """Enforce a wall-clock timeout via SIGALRM on the main thread or trace fallback."""
+class _SandboxTimeoutError(BaseException):
+    """Unrecoverable timeout raised inside the sandbox so except Exception cannot swallow it."""
+
+
+def _run_with_timeout(fn: Callable[[], Any], timeout_seconds: float) -> Any:
+    """Execute ``fn`` in a daemon worker thread enforced by trace deadlines and join timeout."""
     if timeout_seconds <= 0:
         raise ValueError("timeout_seconds must be positive")
 
-    use_sigalrm = (
-        hasattr(signal, "SIGALRM")
-        and hasattr(signal, "setitimer")
-        and threading.current_thread() is threading.main_thread()
-    )
-    if use_sigalrm:
-        def _handle_timeout(signum: int, frame: FrameType | None) -> None:
-            raise TimeoutError(f"Execution timed out after {timeout_seconds}s")
+    result_box: list[Any] = []
+    error_box: list[BaseException] = []
+    deadline = time.monotonic() + timeout_seconds
 
-        prev_handler = signal.signal(signal.SIGALRM, _handle_timeout)
-        prev_timer = signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
-        try:
-            yield
-        finally:
-            signal.setitimer(signal.ITIMER_REAL, 0)
-            signal.signal(signal.SIGALRM, prev_handler)
-            if prev_timer[0] > 0:
-                signal.setitimer(signal.ITIMER_REAL, prev_timer[0], prev_timer[1])
-    else:
-        deadline = time.monotonic() + timeout_seconds
-        prev_trace = sys.gettrace()
+    def _trace_deadline(frame: FrameType, event: str, arg: Any) -> Any:
+        if time.monotonic() > deadline:
+            raise _SandboxTimeoutError(f"Execution timed out after {timeout_seconds}s")
+        return _trace_deadline
 
-        def _trace_deadline(frame: FrameType, event: str, arg: Any) -> Any:
-            if time.monotonic() > deadline:
-                raise TimeoutError(f"Execution timed out after {timeout_seconds}s")
-            return _trace_deadline
-
+    def _target() -> None:
         sys.settrace(_trace_deadline)
         try:
-            yield
+            result_box.append(fn())
+        except BaseException as exc:
+            error_box.append(exc)
         finally:
-            sys.settrace(prev_trace)
+            sys.settrace(None)
+
+    worker = threading.Thread(target=_target, daemon=True)
+    worker.start()
+    worker.join(timeout=timeout_seconds + 0.5)
+    if worker.is_alive():
+        raise _SandboxTimeoutError(f"Execution timed out after {timeout_seconds}s")
+    if error_box:
+        raise error_box[0]
+    return result_box[0]
 
 
 class SandboxExecutor:
@@ -108,9 +103,8 @@ class SandboxExecutor:
         call_args = {**INTENT_DEFAULT_ARGS.get(intent, {}), **(args or {})}
 
         try:
-            with _execution_timeout(timeout_seconds):
-                exec(code, namespace)
-        except Exception as e:
+            _run_with_timeout(lambda: exec(code, namespace), timeout_seconds)
+        except (_SandboxTimeoutError, TimeoutError, Exception) as e:
             tb = traceback.format_exc()
             raise JaxGeminiExecutionError(
                 f"Code failed during definition phase: {e}\n\n{tb}",
@@ -126,10 +120,8 @@ class SandboxExecutor:
             )
 
         try:
-            with _execution_timeout(timeout_seconds):
-                result = namespace[fn_name](**call_args)
-            return result
-        except Exception as e:
+            return _run_with_timeout(lambda: namespace[fn_name](**call_args), timeout_seconds)
+        except (_SandboxTimeoutError, TimeoutError, Exception) as e:
             tb = traceback.format_exc()
             raise JaxGeminiExecutionError(
                 f"Function '{fn_name}' raised an error during execution:\n"

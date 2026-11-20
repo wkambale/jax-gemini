@@ -12,11 +12,15 @@ class TestRetrySecurity:
         err = (
             'Traceback (most recent call last):\n'
             '  File "/Users/alice/secret_repo/src/jax_gemini/sandbox/executor.py", line 80\n'
-            'ValueError: bad input'
+            'ValueError: bad input api_key=sk-secret-token123 '
+            'with AIzaSyD-1234567890abcdefghij and Bearer mytoken999'
         )
         sanitized = sanitize_error_for_llm(err)
         assert "/Users/alice/secret_repo" not in sanitized
         assert 'File "<redacted>/executor.py"' in sanitized
+        assert "AIzaSyD" not in sanitized
+        assert "sk-secret-token123" not in sanitized
+        assert "mytoken999" not in sanitized
 
     def test_build_fix_prompt_prevents_fence_breakout_and_syncs_imports(self):
         prompt = CodeFixer.build_fix_prompt(

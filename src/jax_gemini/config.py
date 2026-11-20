@@ -86,14 +86,13 @@ class JaxGeminiConfig:
 
     def validate(self) -> None:
         """Raise JaxGeminiConfigError if config is invalid."""
-        if not self.gemini_api_key or not str(self.gemini_api_key).strip():
-            env_key = os.environ.get("GEMINI_API_KEY")
-            if env_key and env_key.strip():
-                self.gemini_api_key = env_key
+        effective_key = self.gemini_api_key
+        if not effective_key or not str(effective_key).strip():
+            effective_key = os.environ.get("GEMINI_API_KEY")
         if (
-            not self.gemini_api_key
-            or not isinstance(self.gemini_api_key, str)
-            or not self.gemini_api_key.strip()
+            not effective_key
+            or not isinstance(effective_key, str)
+            or not effective_key.strip()
         ):
             raise JaxGeminiConfigError(
                 "gemini_api_key is not set. "

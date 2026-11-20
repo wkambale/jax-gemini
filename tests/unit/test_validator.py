@@ -157,3 +157,12 @@ class TestCodeValidator:
         ):
             with pytest.raises(JaxGeminiValidationError):
                 CodeValidator.validate(bad, "load_data" if "load_data" in bad else "build")
+
+    def test_bare_except_and_baseexception_blocked(self):
+        for bad in (
+            "def build_model(rngs):\n    try:\n        return 1\n    except:\n        return 2\n",
+            "def build_model(rngs):\n"
+            "    try:\n        return 1\n    except BaseException:\n        return 2\n",
+        ):
+            with pytest.raises(JaxGeminiValidationError):
+                CodeValidator.validate(bad, "build")

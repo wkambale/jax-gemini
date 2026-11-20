@@ -3,6 +3,8 @@ import re
 from jax_gemini.codegen.validator import INTENT_ALLOWED_IMPORTS, WHITELIST_IMPORTS
 
 _ABS_PATH_RE = re.compile(r'File "([^"]+)"')
+_API_KEY_RE = re.compile(r"AIza[0-9A-Za-z_\-]{20,}")
+_AUTH_TOKEN_RE = re.compile(r"(?i)(\b(?:bearer\s+|api[_-]?key\s*[=:]\s*))([^\s'\",;]+)")
 _MAX_ERROR_CHARS = 1500
 _MAX_CODE_CHARS = 20000
 
@@ -14,7 +16,7 @@ def _safe_fence(text: str) -> str:
 
 
 def sanitize_error_for_llm(error_message: str) -> str:
-    """Redact host filesystem paths, control chars, and long tracebacks before LLM retry."""
+    """Redact host filesystem paths, secrets, control chars, and long tracebacks."""
     cleaned = error_message.replace("\x00", "")
 
     def _redact_file(match: re.Match[str]) -> str:
@@ -25,6 +27,8 @@ def sanitize_error_for_llm(error_message: str) -> str:
         return f'File "<redacted>/{filename}"'
 
     redacted = _ABS_PATH_RE.sub(_redact_file, cleaned)
+    redacted = _API_KEY_RE.sub("<redacted-api-key>", redacted)
+    redacted = _AUTH_TOKEN_RE.sub(r"\1<redacted>", redacted)
     if len(redacted) > _MAX_ERROR_CHARS:
         redacted = redacted[:_MAX_ERROR_CHARS] + "\n... [truncated]"
     return redacted
