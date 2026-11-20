@@ -17,7 +17,7 @@ from jax_gemini.exceptions import (
 )
 from jax_gemini.llm.gemini import GeminiLLM
 from jax_gemini.memory.conversation import ConversationMemory
-from jax_gemini.prompts.context_builder import ContextBuilder
+from jax_gemini.prompts.context_builder import MAX_CONTEXT_PROMPT_CHARS, ContextBuilder
 from jax_gemini.sandbox.executor import SandboxExecutor
 
 
@@ -71,6 +71,7 @@ class JaxGemini:
         intent: str,
         runtime_args: dict[str, Any] | None = None,
     ) -> Any:
+        ContextBuilder.validate_prompt(user_prompt)
         llm = self._get_llm()
         context = ContextBuilder.build(
             intent=intent,
@@ -99,6 +100,7 @@ class JaxGemini:
                     user_prompt=fix_prompt,
                     memory=self._memory,
                     current_model_state=self._memory.get_current_model_state(),
+                    max_prompt_chars=MAX_CONTEXT_PROMPT_CHARS,
                 )
 
             try:
