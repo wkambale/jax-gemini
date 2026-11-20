@@ -19,7 +19,7 @@ from jax_gemini.exceptions import (
     JaxGeminiValidationError,
 )
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 __author__ = "Wesley Kambale"
 __license__ = "MIT"
 

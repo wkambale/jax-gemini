@@ -1,69 +1,94 @@
-# Quickstart Guide
+# Quickstart guide
 
-This guide introduces you to the core workflows for using `jax-gemini`.
+This guide walks through installing `jax-gemini` and executing common model workflows.
 
 ## Prerequisites
-Ensure that you have installed the package via [PyPI (`jax-gemini`)](https://pypi.org/project/jax-gemini/0.1.2/) either in your virtual environment or Jupyter notebook (`pip install jax-gemini`, or `pip install "jax-gemini[viz]"` for plotting support).
-Before digging deeply into the logic, ensure that you have initialized the system credentials. 
-Obtain a valid **Google Gemini API Key** and set it safely inside operations:
-```python
-import jax_gemini as jg
-import os
 
-# Automatically pulls from os environment by default or overrides manually
+Install version `0.1.3` from [PyPI](https://pypi.org/project/jax-gemini/0.1.3/):
+
+```bash
+pip install jax-gemini
+```
+
+If you plan to generate plots with `jg.visualize_data()`, include the optional visualization extra:
+
+```bash
+pip install "jax-gemini[viz]"
+```
+
+Configure your Gemini API key via the `GEMINI_API_KEY` environment variable or explicitly through `jg.config.set()`:
+
+```python
+import os
+import jax_gemini as jg
+
 jg.config.set({
     "gemini_api_key": os.environ.get("GEMINI_API_KEY"),
-    "model_name": "gemini-3.1-pro", 
-    "temperature": 0.2
+    "model_name": "gemini-3.1-pro",
+    "temperature": 0.2,
 })
 ```
 
-## Step 1: Building a Model
-Building an architecture does not require you to write typical JAX syntax classes. Instead, we call the `jg.build()` methodology outlining specific needs.
+## Build a model
+
+Call `jg.build()` with a natural-language architecture specification. `jax-gemini` generates `flax.nnx` code, validates it, executes it in the sandbox, and returns the instantiated `flax.nnx.Module`.
 
 ```python
-# Instantiates a valid jax.flax.nnx.Module!
 my_model = jg.build(
-    "Design a CNN model built for 32x32 color image classifications. Ensure it utilizes 2 Convolutional Blocks followed by a Maxpool and Dense heads."
+    "Design a CNN for 32x32 RGB image classification using two convolutional blocks, "
+    "max pooling, and dense classification layers."
 )
 ```
 
-## Step 2: Refining Architecture Iteratively
-Once the object is created, we can modify it through iterative follow-ups keeping preceding steps in conversation memory contexts:
+## Refine iteratively
+
+Session memory tracks prior turns and the active model state so follow-up modifications build on your existing architecture:
+
 ```python
-# Modifies the active my_model in the session tree.
-my_model = jg.modify("Refactor the model by integrating a Spatial Dropout wrapper between the CNN blocks to mitigate overfitting.")
+my_model = jg.modify(
+    "Add dropout with rate 0.25 between the convolutional blocks to reduce overfitting."
+)
 ```
 
-## Step 3: Inspecting Outputs 
-`jax-gemini` isn't a blackbox. If you ever feel curious about what the underlying code executing your objects looks like or what the LLM concluded, use our transparent methods:
-```python
-# Outputs plain Python String logic
-print(jg.show_code())
+## Inspect generated code
 
-# Outputs descriptive natural-language summaries representing changes
+You can review the validated Python source and Gemini's explanation at any point after an operation succeeds:
+
+```python
+print(jg.show_code())
 print(jg.explain())
 ```
 
-## Step 4: Training & Evaluation
-Training directly passes dataset tuple metrics returning validated models:
+## Train and evaluate
+
+Pass `(X, y)` NumPy array tuples into `jg.train()` and `jg.evaluate()`:
+
 ```python
-tuned_model, metrics = jg.train(
-    prompt="Train for 15 epochs leveraging categorical cross-entropy loss alongside learning rate schedulers",
-    dataset=(X_train, y_train)
+trained_model, metrics = jg.train(
+    prompt="Train for 15 epochs with categorical cross-entropy loss and Adam",
+    dataset=(X_train, y_train),
 )
+print("Training loss:", metrics["loss"])
 
-print("Loss observed: ", metrics['loss'])
+results = jg.evaluate(
+    "Compute test set accuracy and loss",
+    dataset=(X_test, y_test),
+)
 ```
 
-Evaluate testing payloads:
+## Save and load checkpoints
+
+Checkpoints are stored via Orbax strictly inside `config.checkpoint_dir` using relative names:
+
 ```python
-results = jg.evaluate("Run accuracy checks matching targets.", dataset=(X_test, y_test))
+ckpt_path = jg.save("v1_cnn_model_production")
+restored_model = jg.load("v1_cnn_model_production")
 ```
 
-## Step 5: Checkpointing
-Use the underlying state checkpoint methodologies powered natively through Orbax seamlessly.
+## Automatic intent routing
+
+If you prefer a single entrypoint, `jg.run()` classifies the prompt with `IntentClassifier` and dispatches to the corresponding operation:
+
 ```python
-# Saves state to local project /jax_gemini_checkpoints path defaults.
-jg.save("v1_cnn_model_production")
+results = jg.run("Evaluate model accuracy on test set", dataset=(X_test, y_test))
 ```

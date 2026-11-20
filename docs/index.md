@@ -1,14 +1,30 @@
-# jax-gemini Index Map
+# jax-gemini
 
-Welcome to the `jax-gemini` documentation!
+<div class="jg-meta">
+Version <code>0.1.3</code> (<a href="https://pypi.org/project/jax-gemini/0.1.3/">PyPI</a>) | Python 3.10 to 3.12 | MIT License
+</div>
 
-[![PyPI version](https://img.shields.io/pypi/v/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.2/)
+`jax-gemini` turns plain English prompts into validated, executable JAX and Flax pipelines powered by Google Gemini. Generated code is checked by an AST auditor, executed inside a restricted runtime namespace, and returned directly as live Python and `flax.nnx.Module` objects.
 
-`jax-gemini` allows executing and dynamically instantiating robust deep-learning pipelines using JAX and Flax strictly out of conversational natural language instructions. Powered by Gemini, the package orchestrates automatic AST compilation handling code execution inside isolated runtime namespaces.
-
-## Table of Contents
-
-- **[Quickstart](quickstart.md)** — Start utilizing the primary pipeline building, refining, evaluating, and checkpoint saving paradigms.
-- **[API Reference](api-reference.md)** — Detailed explanations traversing methods encompassing `build`, `train`, `modify`, `evaluate`, and config setups.
-- **[Architecture](architecture.md)** — Insight into how Code Generators, AST Validators, Sandbox Executors, Intent Classifications and the Retry Controller merge together.
-- **[Security Protocol](security.md)** — Unpacking what safeguards `jax-gemini` implements out-of-the-box avoiding malignant prompt injections into arbitrary runtime code execution.
+<div class="jg-grid">
+  <article class="jg-card">
+    <h3>Quickstart guide</h3>
+    <p>Install the package, configure your Gemini API key, and run build, training, evaluation, and checkpoint workflows.</p>
+    <a class="jg-card-link" href="quickstart/">Read quickstart</a>
+  </article>
+  <article class="jg-card">
+    <h3>API reference</h3>
+    <p>Review configuration options, top-level functions, pipeline stage wrappers, and Flax or Optax helpers.</p>
+    <a class="jg-card-link" href="api-reference/">Browse API reference</a>
+  </article>
+  <article class="jg-card">
+    <h3>Architecture internals</h3>
+    <p>Understand how prompt building, AST validation, sandbox proxies, and bounded conversation memory connect.</p>
+    <a class="jg-card-link" href="architecture/">Explore architecture</a>
+  </article>
+  <article class="jg-card">
+    <h3>Security protocol</h3>
+    <p>Inspect the AST rules, import scoping, filesystem confinement, secret redaction, and timeout mechanisms.</p>
+    <a class="jg-card-link" href="security/">Review security model</a>
+  </article>
+</div>

@@ -1,0 +1,118 @@
+:root {
+  /* Primary brand scale */
+  --jg-brand-50: #f0f5fa;
+  --jg-brand-100: #dce7f3;
+  --jg-brand-200: #b9cfe7;
+  --jg-brand-700: #1d4269;
+  --jg-brand-800: #14304d;
+  --jg-brand-900: #0c1f33;
+  --jg-brand-950: #071320;
+
+  /* Secondary accent scale */
+  --jg-accent-50: #fff4ec;
+  --jg-accent-300: #fdba8c;
+  --jg-accent-400: #fb923c;
+  --jg-accent-500: #ea580c;
+
+  /* Neutral ink tokens */
+  --jg-ink: #0f1722;
+  --jg-ink-muted: #3e4c5e;
+  --jg-ink-soft: #5f6f82;
+
+  /* Surface and border tokens */
+  --jg-white: #ffffff;
+  --jg-sand: #faf8f4;
+  --jg-mist: #f3f6fa;
+  --jg-line: #dce3ec;
+  --jg-line-strong: #c2cddb;
+
+  /* MkDocs Material role mappings */
+  --md-primary-fg-color: var(--jg-brand-800);
+  --md-primary-fg-color--light: var(--jg-brand-700);
+  --md-primary-fg-color--dark: var(--jg-brand-900);
+  --md-accent-fg-color: var(--jg-accent-500);
+  --md-default-fg-color: var(--jg-ink);
+  --md-default-fg-color--light: var(--jg-ink-muted);
+  --md-default-bg-color: var(--jg-white);
+}
+
+.md-header {
+  background-color: var(--jg-brand-800);
+  border-bottom: 1px solid var(--jg-brand-900);
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4 {
+  color: var(--jg-ink);
+  font-feature-settings: "cv11", "ss01";
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  text-transform: none;
+  text-wrap: balance;
+}
+
+.md-typeset p {
+  color: var(--jg-ink-muted);
+  line-height: 1.65;
+  max-width: 65ch;
+  text-wrap: pretty;
+}
+
+.md-typeset table,
+.md-typeset code,
+.md-nav__item {
+  font-feature-settings: "cv11", "ss01";
+  font-variant-numeric: tabular-nums;
+}
+
+.md-typeset .admonition,
+.md-typeset pre > code,
+.md-typeset table:not([class]) {
+  border: 1px solid var(--jg-line);
+  border-radius: 0.5rem;
+}
+
+.jg-meta {
+  border-bottom: 1px solid var(--jg-line);
+  color: var(--jg-ink-soft);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+}
+
+.jg-grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  margin: 1.5rem 0;
+}
+
+.jg-card {
+  background-color: var(--jg-sand);
+  border: 1px solid var(--jg-line);
+  border-radius: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+}
+
+.jg-card h3 {
+  border-top: 1px solid var(--jg-line-strong);
+  margin: 0.5rem 0 0.5rem;
+  padding-top: 0.75rem;
+}
+
+.jg-card p {
+  font-size: 0.925rem;
+  margin: 0 0 1rem;
+}
+
+.jg-card-link {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: auto;
+}

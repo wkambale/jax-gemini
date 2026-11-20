@@ -123,7 +123,7 @@ class JaxGemini:
                     timeout_seconds=self.config.timeout_seconds,
                 )
 
-                # Success — update state
+                # Success: update session state
                 self._last_code = code
                 self._last_response = response
                 self._memory.add_turn("user", user_prompt)

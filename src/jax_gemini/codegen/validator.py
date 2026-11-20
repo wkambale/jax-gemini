@@ -230,7 +230,7 @@ class CodeValidator:
         lines = code.strip().splitlines()
         if len(lines) > MAX_CODE_LINES:
             raise JaxGeminiValidationError(
-                f"Generated code is {len(lines)} lines — maximum is {MAX_CODE_LINES}. "
+                f"Generated code is {len(lines)} lines; maximum is {MAX_CODE_LINES}. "
                 "This may indicate a hallucination or prompt injection attempt.",
                 code=code,
             )
@@ -247,7 +247,7 @@ class CodeValidator:
         nodes = list(ast.walk(tree))
         if len(nodes) > MAX_AST_NODES:
             raise JaxGeminiValidationError(
-                f"Generated code AST has {len(nodes)} nodes — maximum is {MAX_AST_NODES}.",
+                f"Generated code AST has {len(nodes)} nodes; maximum is {MAX_AST_NODES}.",
                 code=code,
             )
 

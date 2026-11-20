@@ -24,7 +24,7 @@ AVAILABLE FLAX NNX COMPONENTS:
 - nnx.relu, nnx.tanh, nnx.sigmoid, nnx.gelu
 - nnx.Rngs  (always pass rngs through to sub-modules)
 
-EXAMPLE 1 — 3-layer MLP:
+EXAMPLE 1: 3-layer MLP:
 ```python
 import flax.nnx as nnx
 
@@ -38,7 +38,7 @@ def build_model(rngs: nnx.Rngs) -> nnx.Module:
     )
 ```
 
-EXAMPLE 2 — CNN for image classification:
+EXAMPLE 2: CNN for image classification:
 ```python
 import flax.nnx as nnx
 
@@ -58,10 +58,10 @@ def build_model(rngs: nnx.Rngs) -> nnx.Module:
     return SimpleCNN(rngs)
 ```
 
-COUNTER-EXAMPLE — DO NOT DO THIS:
+COUNTER-EXAMPLE: do not do this:
 ```python
-import flax.linen as nn  # WRONG — use flax.nnx, not flax.linen
-import os               # WRONG — os is not allowed
+import flax.linen as nn  # WRONG: use flax.nnx, not flax.linen
+import os               # WRONG: os is not allowed
 ```
 
 Respond ONLY with a JSON object matching this schema:
@@ -86,7 +86,7 @@ RULES:
 - metrics_dict MUST contain at least "loss" and "accuracy" keys with float values.
 - Use optax for the optimizer (optax.adam, optax.sgd, etc.).
 - Use `nnx.Rngs(0)` for any random operations inside the loop.
-- Do NOT use jax.grad directly — use optax's update pattern.
+- Do NOT use jax.grad directly; use optax's update pattern.
 - Only import from: jax, jax.numpy, flax, flax.nnx, optax, numpy.
 
 EXAMPLE training loop:
