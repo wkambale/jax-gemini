@@ -2,8 +2,8 @@
   <h1>Jax-Gemini</h1>
   <p><b>Natural language-driven JAX/Flax model building powered by Google Gemini.</b></p>
   
-  [![PyPI version](https://img.shields.io/pypi/v/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.1/)
-  [![Python Versions](https://img.shields.io/pypi/pyversions/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.1/)
+  [![PyPI version](https://img.shields.io/pypi/v/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.2/)
+  [![Python Versions](https://img.shields.io/pypi/pyversions/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.2/)
   [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 </div>
 
@@ -24,9 +24,11 @@ Unlike traditional descriptive LLM wrappers, **jax-gemini returns real, executab
 
 ### Installation
 
-Install via [PyPI](https://pypi.org/project/jax-gemini/0.1.1/):
+Install via [PyPI](https://pypi.org/project/jax-gemini/0.1.2/):
 ```bash
 pip install jax-gemini
+# Optional plotting support for jg.visualize_data():
+pip install "jax-gemini[viz]"
 ```
 
 Setup your [Gemini API Key](https://aistudio.google.com/):
@@ -61,6 +63,9 @@ print(f"Accuracy: {metrics['accuracy']:.2%}")
 
 # Checkpoint Persistence
 checkpoint_path = jg.save("digit_classifier_v1")
+
+# Automatic Intent Routing
+model = jg.run("Evaluate accuracy on the test set", dataset=(X_test, y_test))
 ```
 
 See [examples/](examples/) for more comprehensive workflows such as Jupyter Notebook deployments end-to-end setups.
