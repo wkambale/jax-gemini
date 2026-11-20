@@ -1,4 +1,9 @@
-# jax-gemini
+# Jax Gemini
+
+[![PyPI version](https://img.shields.io/pypi/v/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.3/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/jax-gemini.svg)](https://pypi.org/project/jax-gemini/0.1.3/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/wkambale/jax-gemini/blob/main/LICENSE)
+[![CI](https://github.com/wkambale/jax-gemini/actions/workflows/ci.yml/badge.svg)](https://github.com/wkambale/jax-gemini/actions/workflows/ci.yml)
 
 <div class="jg-meta">
 Version <code>0.1.3</code> (<a href="https://pypi.org/project/jax-gemini/0.1.3/">PyPI</a>) | Python 3.10 to 3.12 | MIT License

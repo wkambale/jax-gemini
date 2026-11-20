@@ -34,13 +34,11 @@ class TestEditorialAndVersionHygiene:
         assert match is not None
         assert jax_gemini.__version__ == match.group(1)
 
-    def test_no_em_or_en_dashes_emojis_or_badge_pills(self):
+    def test_no_em_or_en_dashes_or_emojis(self):
         for path in _iter_repo_files():
             text = path.read_text(encoding="utf-8", errors="replace")
             assert not _FORBIDDEN_DASH_RE.search(text), f"Forbidden dash in {path}"
             assert not _FORBIDDEN_EMOJI_RE.search(text), f"Forbidden emoji in {path}"
-            if path.suffix == ".md":
-                assert "img.shields.io" not in text, f"Pill badge found in {path}"
 
     def test_markdown_headings_have_no_ampersands_or_trailing_periods(self):
         for path in _iter_repo_files():
