@@ -58,3 +58,40 @@ class TestSandboxExecutor:
         )
         model = self.executor.run(code, "build", {"rngs": nnx.Rngs(0)})
         assert model is not None
+
+    def test_numpy_allow_pickle_and_path_traversal_blocked(self, tmp_path):
+        import numpy as np
+
+        outside = tmp_path.parent / "outside.npy"
+        sandbox_dir = tmp_path / "sandbox"
+        sandbox_dir.mkdir()
+        np.save(sandbox_dir / "ok.npy", np.array([1, 2, 3]))
+
+        ok_code = "import numpy as np\ndef load_data():\n    return np.load('ok.npy')\n"
+        arr = self.executor.run(ok_code, "load_data", allowed_dirs=(sandbox_dir,))
+        assert arr.tolist() == [1, 2, 3]
+
+        traversal_code = (
+            "import numpy as np\n"
+            "def load_data():\n"
+            f"    return np.load('{outside}')\n"
+        )
+        with pytest.raises(JaxGeminiExecutionError, match="escapes allowed directories"):
+            self.executor.run(traversal_code, "load_data", allowed_dirs=(sandbox_dir,))
+
+        pickle_kw_code = (
+            "import numpy as np\n"
+            "def load_data():\n"
+            "    flag = True\n"
+            "    return np.load('ok.npy', allow_pickle=flag)\n"
+        )
+        with pytest.raises(JaxGeminiValidationError, match="allow_pickle"):
+            self.executor.run(pickle_kw_code, "load_data", allowed_dirs=(sandbox_dir,))
+
+        pickle_pos_code = (
+            "import numpy as np\n"
+            "def load_data():\n"
+            "    return np.load('ok.npy', None, True)\n"
+        )
+        with pytest.raises(JaxGeminiExecutionError, match="Pickle deserialization"):
+            self.executor.run(pickle_pos_code, "load_data", allowed_dirs=(sandbox_dir,))

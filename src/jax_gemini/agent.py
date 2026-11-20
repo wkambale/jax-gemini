@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Any, cast
 
 import flax.nnx as nnx
@@ -72,7 +73,14 @@ class JaxGemini:
                 response = llm.generate(context, schema)
                 code = CodeParser.extract(response, intent)
                 CodeValidator.validate(code, intent)
-                result = self._executor.run(code, intent, runtime_args)
+                allowed_dirs = (
+                    (Path(self.config.checkpoint_dir),)
+                    if intent in ("save", "load")
+                    else (Path.cwd(), Path(self.config.checkpoint_dir))
+                )
+                result = self._executor.run(
+                    code, intent, runtime_args, allowed_dirs=allowed_dirs
+                )
 
                 # Success — update state
                 self._last_code = code
