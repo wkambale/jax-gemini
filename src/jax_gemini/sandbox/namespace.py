@@ -1,5 +1,6 @@
 import builtins
 import os
+import weakref
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from types import MappingProxyType, ModuleType
@@ -12,7 +13,13 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 
-from jax_gemini.codegen.validator import INTENT_ALLOWED_IMPORTS, WHITELIST_IMPORTS
+from jax_gemini.codegen.validator import (
+    BANNED_ATTRIBUTES,
+    BANNED_NUMPY_ATTRIBUTES,
+    INTENT_ALLOWED_IMPORTS,
+    WHITELIST_IMPORTS,
+    is_banned_module_path,
+)
 
 try:
     import orbax
@@ -30,12 +37,18 @@ try:
 except ImportError:
     _matplotlib_available = False
 
-_BLOCKED_NUMPY_ATTRS: frozenset[str] = frozenset(
-    {"fromfile", "memmap", "DataSource", "ctypeslib", "f2py", "distutils", "testing", "lib"}
-)
+_BLOCKED_NUMPY_ATTRS: frozenset[str] = BANNED_NUMPY_ATTRIBUTES
 _BLOCKED_PYPLOT_ATTRS: frozenset[str] = frozenset(
     {"switch_backend", "rc_file", "rc_file_defaults", "matplotlib_fname"}
 )
+_BLOCKED_MATPLOTLIB_ATTRS: frozenset[str] = frozenset(
+    {"use", "rc_file", "rc_file_defaults", "matplotlib_fname", "backends", "backend_bases"}
+)
+
+_PROXY_STATE: weakref.WeakKeyDictionary[
+    ModuleType, tuple[ModuleType, dict[str, Any], frozenset[str]]
+] = weakref.WeakKeyDictionary()
+_PROXY_SELF_GUARD = frozenset({"_target", "_overrides", "_blocked"})
 
 
 def _resolve_confined_path(
@@ -67,18 +80,16 @@ class _SafeModuleProxy(ModuleType):
         blocked: frozenset[str] = frozenset(),
     ) -> None:
         super().__init__(target.__name__)
-        object.__setattr__(self, "_target", target)
-        object.__setattr__(self, "_overrides", overrides or {})
-        object.__setattr__(self, "_blocked", blocked)
+        _PROXY_STATE[self] = (target, dict(overrides or {}), frozenset(blocked))
 
     def __getattr__(self, name: str) -> Any:
-        blocked: frozenset[str] = object.__getattribute__(self, "_blocked")
-        if name in blocked:
+        if name in _PROXY_SELF_GUARD:
             raise AttributeError(f"Attribute '{name}' is blocked in sandbox.")
-        overrides: dict[str, Any] = object.__getattribute__(self, "_overrides")
+        target, overrides, blocked = _PROXY_STATE[self]
+        if name in blocked or is_banned_module_path(f"{target.__name__}.{name}"):
+            raise AttributeError(f"Attribute '{name}' is blocked in sandbox.")
         if name in overrides:
             return overrides[name]
-        target: ModuleType = object.__getattribute__(self, "_target")
         attr = getattr(target, name)
         if isinstance(attr, ModuleType) and not isinstance(attr, _SafeModuleProxy):
             return _SafeModuleProxy(attr)
@@ -92,11 +103,20 @@ class _SafeModuleProxy(ModuleType):
 
 
 def _wrap_path_io(
-    fn: Callable[..., Any], allowed_dirs: tuple[Path, ...]
+    fn: Callable[..., Any],
+    allowed_dirs: tuple[Path, ...],
+    kw_names: tuple[str, ...] = ("fname", "file", "directory", "path"),
 ) -> Callable[..., Any]:
-    def _wrapped(path_arg: Any, *args: Any, **kwargs: Any) -> Any:
-        safe_path = _resolve_confined_path(path_arg, allowed_dirs)
-        return fn(safe_path, *args, **kwargs)
+    def _wrapped(*args: Any, **kwargs: Any) -> Any:
+        if args:
+            safe_path = _resolve_confined_path(args[0], allowed_dirs)
+            return fn(safe_path, *args[1:], **kwargs)
+        for key in kw_names:
+            if key in kwargs:
+                new_kwargs = dict(kwargs)
+                new_kwargs[key] = _resolve_confined_path(kwargs[key], allowed_dirs)
+                return fn(*args, **new_kwargs)
+        raise PermissionError("Sandbox I/O requires a confined path argument.")
 
     return _wrapped
 
@@ -124,31 +144,54 @@ def _create_safe_numpy(allowed_dirs: tuple[Path, ...]) -> ModuleType:
     return _SafeModuleProxy(np, overrides=overrides, blocked=_BLOCKED_NUMPY_ATTRS)
 
 
+def _confine_figure(fig: Any, allowed_dirs: tuple[Path, ...]) -> Any:
+    """Confine Figure.savefig on pyplot-created Figure objects to allowed_dirs."""
+    raw_savefig = getattr(fig, "savefig", None)
+    if callable(raw_savefig):
+        object.__setattr__(fig, "savefig", _wrap_path_io(raw_savefig, allowed_dirs, ("fname",)))
+    return fig
+
+
 def _create_safe_pyplot(allowed_dirs: tuple[Path, ...]) -> ModuleType:
+    def _safe_figure(*args: Any, **kwargs: Any) -> Any:
+        return _confine_figure(plt.figure(*args, **kwargs), allowed_dirs)
+
+    def _safe_subplots(*args: Any, **kwargs: Any) -> Any:
+        res = plt.subplots(*args, **kwargs)
+        if isinstance(res, tuple) and len(res) >= 1:
+            _confine_figure(res[0], allowed_dirs)
+        return res
+
     overrides: dict[str, Any] = {
-        "savefig": _wrap_path_io(plt.savefig, allowed_dirs),
-        "imread": _wrap_path_io(plt.imread, allowed_dirs),
-        "imsave": _wrap_path_io(plt.imsave, allowed_dirs),
+        "savefig": _wrap_path_io(plt.savefig, allowed_dirs, ("fname",)),
+        "imread": _wrap_path_io(plt.imread, allowed_dirs, ("fname",)),
+        "imsave": _wrap_path_io(plt.imsave, allowed_dirs, ("fname",)),
+        "figure": _safe_figure,
+        "subplots": _safe_subplots,
     }
     return _SafeModuleProxy(plt, overrides=overrides, blocked=_BLOCKED_PYPLOT_ATTRS)
 
 
 def _create_safe_orbax_checkpoint(allowed_dirs: tuple[Path, ...]) -> ModuleType:
+    checkpointers: weakref.WeakKeyDictionary[Any, Any] = weakref.WeakKeyDictionary()
+
     def _wrap_checkpointer_cls(cls: type[Any]) -> Callable[..., Any]:
         class _ConfinedCheckpointer:
             def __init__(self, *args: Any, **kwargs: Any) -> None:
-                self._inner = cls(*args, **kwargs)
+                checkpointers[self] = cls(*args, **kwargs)
 
             def save(self, directory: Any, *args: Any, **kwargs: Any) -> Any:
                 safe_dir = _resolve_confined_path(directory, allowed_dirs)
-                return self._inner.save(safe_dir, *args, **kwargs)
+                return checkpointers[self].save(safe_dir, *args, **kwargs)
 
             def restore(self, directory: Any, *args: Any, **kwargs: Any) -> Any:
                 safe_dir = _resolve_confined_path(directory, allowed_dirs)
-                return self._inner.restore(safe_dir, *args, **kwargs)
+                return checkpointers[self].restore(safe_dir, *args, **kwargs)
 
             def __getattr__(self, attr: str) -> Any:
-                return getattr(self._inner, attr)
+                if attr.startswith("_"):
+                    raise AttributeError(f"Attribute '{attr}' is blocked in sandbox.")
+                return getattr(checkpointers[self], attr)
 
         return _ConfinedCheckpointer
 
@@ -174,24 +217,44 @@ def _make_safe_import(
         name: str,
         globals: Mapping[str, object] | None = None,
         locals: Mapping[str, object] | None = None,
-        fromlist: Sequence[str] = (),
+        fromlist: Sequence[str] | None = None,
         level: int = 0,
     ) -> ModuleType:
         """Restricted __import__ enforcing allowed_imports and returning safe proxies."""
         if level != 0:
             raise ImportError("Relative imports are not allowed.")
         root = name.split(".")[0]
-        if root not in allowed_imports:
+        if root not in allowed_imports or is_banned_module_path(name):
             raise ImportError(f"Import '{name}' is not allowed.")
-        if fromlist:
+        for part in name.split(".")[1:]:
+            if part in BANNED_ATTRIBUTES or (root == "numpy" and part in BANNED_NUMPY_ATTRIBUTES):
+                raise ImportError(f"Import '{name}' is not allowed.")
+        for sym in fromlist or ():
+            if (
+                sym == "*"
+                or is_banned_module_path(f"{name}.{sym}")
+                or sym in BANNED_ATTRIBUTES
+                or (root == "numpy" and sym in BANNED_NUMPY_ATTRIBUTES)
+            ):
+                raise ImportError(f"Import of '{sym}' from '{name}' is not allowed.")
+
+        if root in safe_modules:
+            if "." in name and name not in safe_modules:
+                # Ensure intermediate submodules exist before resolving via root proxy.
+                builtins.__import__(name, globals, locals, (), level)
+            if not fromlist:
+                return safe_modules[root]
             if name in safe_modules:
                 return safe_modules[name]
-            mod = builtins.__import__(name, globals, locals, fromlist, level)
-            if isinstance(mod, ModuleType) and not isinstance(mod, _SafeModuleProxy):
-                return _SafeModuleProxy(mod)
-            return mod
-        if root in safe_modules:
-            return safe_modules[root]
+            cur: Any = safe_modules[root]
+            for part in name.split(".")[1:]:
+                cur = getattr(cur, part)
+            if isinstance(cur, ModuleType) and not isinstance(cur, _SafeModuleProxy):
+                return _SafeModuleProxy(cur)
+            if isinstance(cur, ModuleType):
+                return cur
+            raise ImportError(f"Import '{name}' is not allowed.")
+
         mod = builtins.__import__(name, globals, locals, fromlist, level)
         if isinstance(mod, ModuleType) and not isinstance(mod, _SafeModuleProxy):
             return _SafeModuleProxy(mod)
@@ -317,7 +380,11 @@ def get_execution_namespace(
 
     if _matplotlib_available and "matplotlib" in allowed_imports:
         safe_plt = _create_safe_pyplot(resolved_dirs)
-        safe_mpl = _SafeModuleProxy(matplotlib, overrides={"pyplot": safe_plt})
+        safe_mpl = _SafeModuleProxy(
+            matplotlib,
+            overrides={"pyplot": safe_plt},
+            blocked=_BLOCKED_MATPLOTLIB_ATTRS,
+        )
         safe_modules["matplotlib"] = safe_mpl
         safe_modules["matplotlib.pyplot"] = safe_plt
         namespace["plt"] = safe_plt

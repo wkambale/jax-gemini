@@ -140,3 +140,42 @@ class TestSandboxExecutor:
             )
             with pytest.raises(JaxGeminiExecutionError, match="timed out"):
                 fut.result(timeout=5.0)
+
+    def test_safe_import_and_keyword_path_confinement(self, tmp_path):
+        from jax_gemini.sandbox.namespace import _SafeModuleProxy, get_execution_namespace
+
+        ns = get_execution_namespace(intent="load_data", allowed_dirs=(tmp_path,))
+        safe_import = ns["__builtins__"]["__import__"]
+
+        with pytest.raises(ImportError, match="not allowed"):
+            safe_import("numpy.ctypeslib", None, None, ("load_library",), 0)
+        with pytest.raises(ImportError, match="not allowed"):
+            safe_import("numpy", None, None, ("fromfile",), 0)
+        with pytest.raises(ImportError, match="not allowed"):
+            safe_import("numpy", None, None, ("*",), 0)
+
+        # Proxy does not expose _target and rejects writes
+        with pytest.raises(AttributeError):
+            _ = ns["np"]._target
+        with pytest.raises(AttributeError):
+            ns["np"].load = lambda *_a, **_k: None
+
+        # Keyword-argument path confinement: inside tmp_path works, outside fails
+        target = tmp_path / "vec.npy"
+        save_kw_code = (
+            "import numpy as np\n"
+            "def load_data():\n"
+            f"    np.save(file={str(target)!r}, arr=np.array([1, 2, 3]))\n"
+            f"    return np.load(file={str(target)!r})\n"
+        )
+        arr = self.executor.run(save_kw_code, "load_data", allowed_dirs=(tmp_path,))
+        assert arr.tolist() == [1, 2, 3]
+
+        escape_kw_code = (
+            "import numpy as np\n"
+            "def load_data():\n"
+            "    np.savetxt(fname='/tmp/escape.txt', X=np.array([1.0]))\n"
+        )
+        with pytest.raises(JaxGeminiExecutionError, match="escapes allowed directories"):
+            self.executor.run(escape_kw_code, "load_data", allowed_dirs=(tmp_path,))
+        assert isinstance(safe_import("flax.nnx", None, None, ("Linear",), 0), _SafeModuleProxy)
