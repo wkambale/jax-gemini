@@ -76,3 +76,21 @@ class TestLLMCredentialLifecycle:
         agent.config.max_retries = 99
         with pytest.raises(JaxGeminiConfigError, match="max_retries"):
             agent.build("m2")
+
+    @patch("jax_gemini.llm.gemini.genai")
+    def test_generate_passes_timeout_request_option(self, mock_genai):
+        resp = MagicMock()
+        resp.text = json.dumps(
+            {
+                "intent": "build",
+                "code": "import flax.nnx as nnx\ndef build_model(rngs):\n    return 1\n",
+                "description": "ok",
+                "warnings": [],
+            }
+        )
+        mock_genai.GenerativeModel.return_value.generate_content.return_value = resp
+
+        agent = jg.JaxGemini(jg.JaxGeminiConfig(gemini_api_key="key-1", timeout_seconds=15))
+        agent.build("m1")
+        call_kwargs = mock_genai.GenerativeModel.return_value.generate_content.call_args.kwargs
+        assert call_kwargs["request_options"] == {"timeout": 15}

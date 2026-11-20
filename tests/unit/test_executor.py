@@ -116,3 +116,27 @@ class TestSandboxExecutor:
         assert "MARKER" not in SAFE_BUILTINS
         with pytest.raises(TypeError):
             SAFE_BUILTINS["MARKER"] = "fail"  # type: ignore[index]
+
+    def test_infinite_loop_times_out(self):
+        loop_code = (
+            "def build_model(rngs):\n"
+            "    while True:\n"
+            "        pass\n"
+        )
+        with pytest.raises(JaxGeminiExecutionError, match="timed out"):
+            self.executor.run(loop_code, "build", {"rngs": None}, timeout_seconds=0.1)
+
+    def test_infinite_loop_times_out_in_worker_thread(self):
+        import concurrent.futures
+
+        loop_code = (
+            "def build_model(rngs):\n"
+            "    while True:\n"
+            "        pass\n"
+        )
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            fut = pool.submit(
+                self.executor.run, loop_code, "build", {"rngs": None}, None, 0.1
+            )
+            with pytest.raises(JaxGeminiExecutionError, match="timed out"):
+                fut.result(timeout=5.0)
