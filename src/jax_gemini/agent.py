@@ -12,12 +12,14 @@ from jax_gemini.config import JaxGeminiConfig
 from jax_gemini.exceptions import (
     JaxGeminiCheckpointError,
     JaxGeminiExecutionError,
+    JaxGeminiIntentError,
     JaxGeminiLLMError,
     JaxGeminiValidationError,
 )
 from jax_gemini.llm.gemini import GeminiLLM
 from jax_gemini.memory.conversation import ConversationMemory
 from jax_gemini.prompts.context_builder import MAX_CONTEXT_PROMPT_CHARS, ContextBuilder
+from jax_gemini.prompts.intent import IntentClassifier
 from jax_gemini.sandbox.executor import SandboxExecutor
 
 
@@ -284,6 +286,38 @@ class JaxGemini:
         return self._generate_and_execute(
             prompt, intent="visualize_data", runtime_args={"dataset": dataset}
         )
+
+    def run(
+        self,
+        prompt: str,
+        dataset: Any = None,
+        name: str | None = None,
+    ) -> Any:
+        """Route a natural-language prompt automatically via IntentClassifier."""
+        intent = IntentClassifier.classify(prompt)
+        if intent == "build":
+            return self.modify(prompt) if self._current_model is not None else self.build(prompt)
+        if intent == "train":
+            return self.train(prompt, dataset=dataset)
+        if intent == "evaluate":
+            return self.evaluate(prompt, dataset=dataset)
+        if intent == "save":
+            if not name:
+                raise JaxGeminiCheckpointError("Saving a model requires a checkpoint 'name'.")
+            return self.save(name)
+        if intent == "load":
+            if not name:
+                raise JaxGeminiCheckpointError("Loading a model requires a checkpoint 'name'.")
+            return self.load(name)
+        if intent == "load_data":
+            return self.load_data(prompt)
+        if dataset is None:
+            raise JaxGeminiIntentError(f"Intent '{intent}' requires a 'dataset' argument.")
+        if intent == "preprocess_data":
+            return self.preprocess_data(prompt, dataset)
+        if intent == "analyze_data":
+            return self.analyze_data(prompt, dataset)
+        return self.visualize_data(prompt, dataset)
 
     def explain(self) -> str:
         """Return a plain-English explanation of the last generated code."""
