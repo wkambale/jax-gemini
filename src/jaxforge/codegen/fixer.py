@@ -2,11 +2,17 @@
 
 import re
 
-from jaxforge.codegen.validator import INTENT_ALLOWED_IMPORTS, WHITELIST_IMPORTS
+from jaxforge.codegen.validator import _CORE_ML_IMPORTS, INTENT_ALLOWED_IMPORTS
 
 _ABS_PATH_RE = re.compile(r'File "([^"]+)"')
-_API_KEY_RE = re.compile(r"AIza[0-9A-Za-z_\-]{20,}|sk-[0-9A-Za-z_\-]{20,}")
-_AUTH_TOKEN_RE = re.compile(r"(?i)(\b(?:bearer\s+|api[_-]?key\s*[=:]\s*))([^\s'\",;]+)")
+_API_KEY_RE = re.compile(
+    r"AIza[0-9A-Za-z_\-]{20,}|sk-[0-9A-Za-z_\-]{20,}|hf_[0-9A-Za-z]{20,}"
+    r"|ghp_[0-9A-Za-z]{20,}|e2b_[0-9A-Za-z_\-]{16,}"
+)
+_AUTH_TOKEN_RE = re.compile(
+    r"(?i)(\b(?:bearer\s+|x-goog-api-key\s*[=:]\s*|x-api-key\s*[=:]\s*"
+    r"|api[_-]?key\s*[=:]\s*|[?&]key=))([^\s'\",;&]+)"
+)
 _MAX_ERROR_CHARS = 1500
 _MAX_CODE_CHARS = 20000
 
@@ -66,9 +72,9 @@ class CodeFixer:
         safe_code = failed_code[:_MAX_CODE_CHARS]
         safe_error = sanitize_error_for_llm(error_message)
         allowed = (
-            INTENT_ALLOWED_IMPORTS.get(intent, WHITELIST_IMPORTS)
+            INTENT_ALLOWED_IMPORTS.get(intent, _CORE_ML_IMPORTS)
             if intent
-            else WHITELIST_IMPORTS
+            else _CORE_ML_IMPORTS
         )
         allowed_list = ", ".join(sorted(allowed))
 

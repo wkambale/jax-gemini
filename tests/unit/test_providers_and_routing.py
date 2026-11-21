@@ -45,6 +45,10 @@ class TestProvidersAndRouting:
             cfg.set({"provider": "unknown"})
         with pytest.raises(JaxForgeConfigError, match="base_url"):
             cfg.set({"base_url": "ftp://invalid"})
+        with pytest.raises(JaxForgeConfigError, match="Plaintext http://"):
+            cfg.set({"base_url": "http://api.remote-llm.example.com/v1"})
+        cfg.set({"base_url": "https://api.remote-llm.example.com/v1"})
+        cfg.set({"base_url": "http://127.0.0.1:11434/v1"})
         with pytest.raises(JaxForgeConfigError, match="execution_backend"):
             cfg.set({"execution_backend": "kubernetes"})
         with pytest.raises(JaxForgeConfigError, match="max_memory_mb"):
@@ -149,8 +153,14 @@ class TestProvidersAndRouting:
         )
         fake_litellm = MagicMock(completion=MagicMock(return_value=fake_resp))
         with patch.dict("sys.modules", {"litellm": fake_litellm}):
-            parsed = backend.generate([{"role": "user", "parts": ["hi"]}], {})
+            parsed = backend.generate(
+                [{"role": "user", "parts": ["hi"]}],
+                {"type": "object", "required": ["intent"]},
+            )
             assert parsed["intent"] == "build"
+            sent_msgs = fake_litellm.completion.call_args.kwargs["messages"]
+            assert sent_msgs[0]["role"] == "system"
+            assert "JSON schema" in sent_msgs[0]["content"]
 
         primary = MagicMock()
         primary.generate.return_value = {"p": 1}
@@ -161,6 +171,93 @@ class TestProvidersAndRouting:
         router = RouterLLM(primary=primary, fast=fast)
         assert router.generate([], {}, use_fast=False) == {"p": 1}
         assert router.generate([], {}, use_fast=True) == {"f": 1}
+
+    def test_cross_provider_key_isolation_headers_alternation_and_redirect_block(
+        self, monkeypatch
+    ):
+        import urllib.error
+        import urllib.request
+
+        from jaxforge.llm.gemini import _NoRedirectHandler
+        from jaxforge.memory.conversation import ConversationMemory
+        from jaxforge.prompts.context_builder import ContextBuilder
+
+        # 1. Cross-provider fast_model_name must NOT leak primary api_key or OPENAI_API_KEY
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-do-not-leak")
+        monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+        cfg = JaxForgeConfig(
+            api_key="sk-ant-primary-secret",
+            model_name="anthropic:claude-sonnet-4-5",
+            fast_model_name="ollama:qwen2.5-coder:7b",
+            base_url="https://proxy.anthropic.example.com/v1",
+        )
+        fast_llm = create_llm(cfg, model_override=cfg.fast_model_name)
+        assert isinstance(fast_llm, OpenAICompatibleLLM)
+        assert fast_llm._headers() == {}
+        assert fast_llm._endpoint() == "http://localhost:11434/v1/chat/completions"
+
+        # 2. Anthropic uses top-level system and strictly alternating user/assistant messages
+        ctx = ContextBuilder.build("build", "Build MLP", ConversationMemory(), None)
+        ant = AnthropicLLM(cfg)
+        captured_payloads: list[dict] = []
+
+        ok_json = '{"intent":"build","code":"1","description":"d"}'
+
+        def _fake_urlopen(req, timeout=60):
+            captured_payloads.append(
+                {
+                    "url": req.full_url,
+                    "headers": dict(req.header_items()),
+                    "body": json.loads(req.data.decode("utf-8")),
+                }
+            )
+            return _FakeHTTPResponse(
+                {
+                    "content": [{"type": "text", "text": ok_json}],
+                    "usage": {"input_tokens": 5, "output_tokens": 5},
+                }
+            )
+
+        with patch("urllib.request.urlopen", side_effect=_fake_urlopen):
+            ant.generate(ctx, {"type": "object", "required": ["intent"]})
+        ant_body = captured_payloads[0]["body"]
+        assert "system" in ant_body and "matching schema" in ant_body["system"]
+        ant_roles = [m["role"] for m in ant_body["messages"]]
+        assert ant_roles == ["user"]
+
+        # 3. Gemini REST sends x-goog-api-key header (never ?key= query string)
+        gem_cfg = JaxForgeConfig(gemini_api_key="gem-secret-header", model_name="gemini-3.1-pro")
+        gem = GeminiLLM(gem_cfg)
+        monkeypatch.setattr(gem, "_generate_via_google_genai", lambda *_a, **_kw: None)
+        captured_payloads.clear()
+        with patch(
+            "urllib.request.urlopen",
+            side_effect=lambda req, timeout=60: (
+                captured_payloads.append(
+                    {
+                        "url": req.full_url,
+                        "headers": {k.lower(): v for k, v in req.header_items()},
+                        "body": json.loads(req.data.decode("utf-8")),
+                    }
+                )
+                or _FakeHTTPResponse(
+                    {
+                        "candidates": [{"content": {"parts": [{"text": ok_json}]}}],
+                        "usageMetadata": {"promptTokenCount": 3, "candidatesTokenCount": 4},
+                    }
+                )
+            ),
+        ):
+            gem.generate(ctx, {"type": "object"})
+        assert "key=" not in captured_payloads[0]["url"]
+        assert captured_payloads[0]["headers"]["x-goog-api-key"] == "gem-secret-header"
+        assert "systemInstruction" in captured_payloads[0]["body"]
+
+        # 4. Redirect handler blocks HTTP 302
+        handler = _NoRedirectHandler()
+        req = urllib.request.Request("https://api.example.com/v1/messages")
+        with pytest.raises(urllib.error.HTTPError, match="redirect"):
+            handler.redirect_request(req, None, 302, "Found", {}, "http://evil.example.com")
 
     def test_unsupported_provider_raises(self):
         bad = JaxForgeConfig()

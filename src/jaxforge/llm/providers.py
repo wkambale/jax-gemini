@@ -12,7 +12,7 @@ from typing import Any, ClassVar
 from jaxforge.config import JaxForgeConfig
 from jaxforge.exceptions import JaxForgeConfigError, JaxForgeLLMError
 from jaxforge.llm.base import AbstractLLM, LLMUsage
-from jaxforge.llm.gemini import GeminiLLM
+from jaxforge.llm.gemini import GeminiLLM, _open_url_safely
 
 
 def _strip_json_fences(raw: str) -> str:
@@ -27,14 +27,63 @@ def _strip_json_fences(raw: str) -> str:
     return text
 
 
-def _normalize_openai_messages(messages: list[dict[str, Any]]) -> list[dict[str, str]]:
-    out: list[dict[str, str]] = []
+def _normalize_openai_messages(
+    messages: list[dict[str, Any]],
+    schema: dict[str, Any] | None = None,
+) -> list[dict[str, str]]:
+    sys_parts: list[str] = []
+    chat_turns: list[dict[str, str]] = []
     for msg in messages:
+        if msg.get("system"):
+            sys_parts.extend(str(p) for p in msg.get("parts", []))
+            continue
+        if msg.get("system_ack"):
+            continue
         role = msg.get("role", "user")
         oai_role = "assistant" if role in ("model", "assistant") else "user"
         content = "\n".join(str(p) for p in msg.get("parts", []))
-        out.append({"role": oai_role, "content": content})
+        chat_turns.append({"role": oai_role, "content": content})
+
+    if schema:
+        sys_parts.append(
+            "Respond ONLY with a valid JSON object adhering to this JSON schema: "
+            f"{json.dumps(schema)}"
+        )
+
+    out: list[dict[str, str]] = []
+    if sys_parts:
+        out.append({"role": "system", "content": "\n\n".join(sys_parts)})
+    out.extend(chat_turns)
     return out
+
+
+def _normalize_anthropic_payload(
+    messages: list[dict[str, Any]],
+    schema: dict[str, Any] | None = None,
+) -> tuple[str | None, list[dict[str, str]]]:
+    sys_parts: list[str] = []
+    chat_turns: list[dict[str, str]] = []
+    for msg in messages:
+        if msg.get("system"):
+            sys_parts.extend(str(p) for p in msg.get("parts", []))
+            continue
+        if msg.get("system_ack"):
+            continue
+        role = msg.get("role", "user")
+        ant_role = "assistant" if role in ("model", "assistant") else "user"
+        content = "\n".join(str(p) for p in msg.get("parts", []))
+        if chat_turns and chat_turns[-1]["role"] == ant_role:
+            chat_turns[-1]["content"] = f"{chat_turns[-1]['content']}\n\n{content}"
+        else:
+            chat_turns.append({"role": ant_role, "content": content})
+
+    if schema:
+        sys_parts.append(
+            "Respond strictly with raw JSON (no markdown fences) matching schema: "
+            f"{json.dumps(schema)}"
+        )
+    sys_text = "\n\n".join(p for p in sys_parts if p).strip() or None
+    return sys_text, chat_turns
 
 
 def _post_json(
@@ -53,13 +102,13 @@ def _post_json(
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:  # noqa: S310
+        with _open_url_safely(req, timeout=timeout_seconds) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             if not isinstance(data, dict):
                 raise JaxForgeLLMError(f"{provider_label} returned non-object response.")
             return data
     except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", errors="replace")[:300]
+        detail = e.read().decode("utf-8", errors="replace")[:300] if e.fp else str(e)
         raise JaxForgeLLMError(f"{provider_label} HTTP {e.code}: {detail}") from e
     except JaxForgeLLMError:
         raise
@@ -102,21 +151,11 @@ class OpenAICompatibleLLM(AbstractLLM):
         start = time.monotonic()
         payload: dict[str, Any] = {
             "model": model_id,
-            "messages": _normalize_openai_messages(messages),
+            "messages": _normalize_openai_messages(messages, schema=schema),
             "temperature": self._config.temperature,
             "max_tokens": self._config.max_output_tokens,
             "response_format": {"type": "json_object"},
         }
-        if schema:
-            payload["messages"].append(
-                {
-                    "role": "user",
-                    "content": (
-                        "Respond ONLY with a valid JSON object adhering to this JSON schema: "
-                        f"{json.dumps(schema)}"
-                    ),
-                }
-            )
         body = _post_json(
             self._endpoint(),
             payload,
@@ -187,23 +226,15 @@ class AnthropicLLM(AbstractLLM):
         model_id = self._config.resolve_model_id()
         start = time.monotonic()
         base = (self._config.base_url or "https://api.anthropic.com/v1").rstrip("/")
-        norm = _normalize_openai_messages(messages)
-        if schema:
-            norm.append(
-                {
-                    "role": "user",
-                    "content": (
-                        "Respond strictly with raw JSON (no markdown fences) matching schema: "
-                        f"{json.dumps(schema)}"
-                    ),
-                }
-            )
-        payload = {
+        sys_text, norm = _normalize_anthropic_payload(messages, schema=schema)
+        payload: dict[str, Any] = {
             "model": model_id,
             "max_tokens": self._config.max_output_tokens,
             "temperature": self._config.temperature,
             "messages": norm,
         }
+        if sys_text:
+            payload["system"] = sys_text
         body = _post_json(
             f"{base}/messages",
             payload,
@@ -272,7 +303,7 @@ class LiteLLMBackend(AbstractLLM):
         start = time.monotonic()
         resp = litellm.completion(
             model=model_id,
-            messages=_normalize_openai_messages(messages),
+            messages=_normalize_openai_messages(messages, schema=schema),
             temperature=self._config.temperature,
             max_tokens=self._config.max_output_tokens,
             timeout=self._config.timeout_seconds,
@@ -346,10 +377,18 @@ class RouterLLM(AbstractLLM):
 
 def create_llm(config: JaxForgeConfig, model_override: str | None = None) -> AbstractLLM:
     """Instantiate the configured LLM backend from JaxForgeConfig."""
+    base_prov = config.resolve_provider()
     cfg = deepcopy(config)
     if model_override:
         cfg.model_name = model_override
+        if ":" in model_override:
+            cfg.provider = "auto"
     prov = cfg.resolve_provider()
+    if model_override and prov != base_prov:
+        # Never forward explicit credentials or custom base_url across distinct providers.
+        cfg.api_key = None
+        cfg.gemini_api_key = None
+        cfg.base_url = None
     if prov == "google":
         return GeminiLLM(cfg)
     if prov in ("openai", "ollama", "openrouter"):
