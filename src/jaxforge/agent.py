@@ -234,8 +234,9 @@ class JaxForge:
         if plan.intent == "build":
             self._current_model = result
         elif plan.intent == "train" and isinstance(result, tuple):
-            self._current_model = result[0]
-            if isinstance(result[1], dict):
+            if len(result) >= 1:
+                self._current_model = result[0]
+            if len(result) > 1 and isinstance(result[1], dict):
                 self._tracker.log_metrics(result[1])
         elif plan.intent == "evaluate" and isinstance(result, dict):
             self._tracker.log_metrics(result)
@@ -499,11 +500,21 @@ class JaxForge:
         records: list[ExperimentCandidate] = []
         best: ExperimentCandidate | None = None
         saved_model = self._current_model
+        saved_turns = list(self._memory._turns)
+        saved_history = list(self._memory._model_history)
+        saved_last_code = self._last_code
+        saved_last_train_code = self._last_train_code
+        saved_last_response = copy.deepcopy(self._last_response)
 
         for idx in range(candidates):
             hint = variants[idx % len(variants)]
             variant_prompt = f"{prompt} ({hint} Trial {idx + 1}/{candidates})"
             self._current_model = saved_model
+            self._memory._turns = list(saved_turns)
+            self._memory._model_history = list(saved_history)
+            self._last_code = saved_last_code
+            self._last_train_code = saved_last_train_code
+            self._last_response = copy.deepcopy(saved_last_response)
             try:
                 model, metrics = self.train(variant_prompt, dataset=dataset)
                 raw_score = metrics.get(metric)
@@ -538,10 +549,24 @@ class JaxForge:
             ):
                 best = cand
 
+        self._memory._turns = list(saved_turns)
+        self._memory._model_history = list(saved_history)
+
         if best is None:
             best = records[0]
-        if best.model is not None:
+        if best.model is not None and best.code:
             self._current_model = best.model
+            self._record_success(
+                "train",
+                prompt,
+                best.code,
+                {"intent": "train", "code": best.code, "description": best.description},
+            )
+        else:
+            self._current_model = saved_model
+            self._last_code = saved_last_code
+            self._last_train_code = saved_last_train_code
+            self._last_response = saved_last_response
         return ExperimentResult(
             best_candidate=best,
             candidates=records,
@@ -774,7 +799,13 @@ class JaxForge:
     def usage_summary(self) -> dict[str, Any]:
         """Return aggregated token and latency telemetry for LLM calls in this session."""
         if self._llm is None:
-            return {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+            return {
+                "calls": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "total_latency_ms": 0.0,
+            }
         hist = self._llm.usage_history
         return {
             "calls": len(hist),

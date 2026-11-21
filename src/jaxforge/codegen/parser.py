@@ -35,10 +35,16 @@ class CodeParser:
 
         diff_text = response.get("diff")
         if isinstance(diff_text, str) and diff_text.strip() and previous_code is not None:
-            patched = apply_unified_diff(previous_code, diff_text).strip()
-            if not patched:
-                raise JaxForgeLLMError("Patch resulted in an empty code block.")
-            return patched
+            try:
+                patched = apply_unified_diff(previous_code, diff_text).strip()
+                if not patched:
+                    raise JaxForgeLLMError("Patch resulted in an empty code block.")
+                return patched
+            except JaxForgeLLMError:
+                fallback_code = response.get("code")
+                if isinstance(fallback_code, str) and fallback_code.strip():
+                    return fallback_code.strip()
+                raise
 
         if "code" not in response:
             raise JaxForgeLLMError(
