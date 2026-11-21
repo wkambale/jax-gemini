@@ -260,7 +260,7 @@ class TestBackendsCliMcpContrib:
     def test_cli_and_mcp_tools(self, tmp_path, capsys):
         assert cli_main(["info"]) == 0
         info_out = json.loads(capsys.readouterr().out)
-        assert info_out["version"] == "0.2.0"
+        assert info_out["version"] == "0.2.1"
         assert "anthropic" in info_out["providers"]
 
         assert cli_main(["devices"]) == 0
