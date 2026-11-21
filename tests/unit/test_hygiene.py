@@ -53,3 +53,18 @@ class TestEditorialAndVersionHygiene:
                     continue
                 assert not _HEADING_AMP_RE.search(line), f"Ampersand in heading of {path}: {line}"
                 assert not line.rstrip().endswith("."), f"Trailing period in {path}: {line}"
+
+    def test_workflows_pin_commit_shas_and_declare_permissions(self):
+        uses_re = re.compile(r"^\s*-?\s*uses:\s*([^\s#]+)")
+        pinned_sha_re = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}$")
+        workflows_dir = REPO_ROOT / ".github" / "workflows"
+        workflow_files = sorted(workflows_dir.glob("*.yml"))
+        assert len(workflow_files) >= 3
+        for wf in workflow_files:
+            text = wf.read_text(encoding="utf-8")
+            assert "\npermissions:\n" in text, f"Missing top-level permissions in {wf}"
+            for line in text.splitlines():
+                match = uses_re.match(line)
+                if match:
+                    ref = match.group(1)
+                    assert pinned_sha_re.match(ref), f"Unpinned action '{ref}' in {wf}"
