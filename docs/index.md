@@ -11,7 +11,7 @@ hide:
   </svg>
   <div class="jf-hero__eyebrow">
     <span class="jf-hero__eyebrow-line" aria-hidden="true"></span>
-    <span>Python SDK version 0.2.0</span>
+    <span>Python SDK version 0.2.1</span>
   </div>
   <h1 class="jf-hero__title">Jax Forge for model-agnostic JAX engineering</h1>
   <p class="jf-hero__lead">Design, preview, validate, train, explore, and export Flax NNX and Equinox pipelines from natural language. Route across Gemini, OpenAI, Anthropic, OpenRouter, LiteLLM, or local Ollama endpoints with strict AST and sandbox guarantees.</p>

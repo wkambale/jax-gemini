@@ -16,7 +16,7 @@ from jaxforge.exceptions import (
 )
 from jaxforge.plan import DatasetProfile, ExperimentCandidate, ExperimentResult, GeneratedPlan
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __author__ = "Wesley Kambale"
 __license__ = "MIT"
 
