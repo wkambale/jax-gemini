@@ -3,34 +3,71 @@
 from __future__ import annotations
 
 import html
+import math
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
 
+_MAX_PROFILE_SAMPLE_ELEMENTS = 65_536
+_MAX_SEQ_CONVERT_LEN = 10_000
+
 
 def _summarize_array(arr: Any) -> dict[str, Any]:
-    """Extract non-sensitive structural metadata from an array-like object."""
-    try:
-        np_arr = np.asarray(arr)
-    except Exception:
+    """Extract bounded, non-sensitive structural metadata without exhausting iterators."""
+    if isinstance(arr, Iterator):
+        return {"type": type(arr).__name__, "streaming": True}
+
+    np_sample: np.ndarray[Any, Any] | None = None
+    full_shape: list[int] | None = None
+    dtype_str: str | None = None
+    total_size: int | None = None
+    sampled = False
+
+    if hasattr(arr, "shape") and hasattr(arr, "dtype") and not isinstance(arr, type):
+        try:
+            raw_shape = [int(d) for d in arr.shape]
+            full_shape = raw_shape
+            dtype_str = str(arr.dtype)
+            total_size = int(math.prod(raw_shape))
+            if total_size > _MAX_PROFILE_SAMPLE_ELEMENTS:
+                sampled = True
+                flat_view = np.asarray(arr.reshape(-1)[:_MAX_PROFILE_SAMPLE_ELEMENTS])
+                np_sample = flat_view
+            else:
+                np_sample = np.asarray(arr)
+        except Exception:
+            return {"type": type(arr).__name__}
+    elif isinstance(arr, (list, tuple)):
+        if len(arr) > _MAX_SEQ_CONVERT_LEN:
+            return {"type": type(arr).__name__, "length": len(arr), "sampled": True}
+        try:
+            np_sample = np.asarray(arr)
+            full_shape = list(np_sample.shape)
+            dtype_str = str(np_sample.dtype)
+            total_size = int(np_sample.size)
+        except Exception:
+            return {"type": type(arr).__name__, "length": len(arr)}
+    else:
         return {"type": type(arr).__name__}
 
     info: dict[str, Any] = {
-        "shape": list(np_arr.shape),
-        "dtype": str(np_arr.dtype),
-        "size": int(np_arr.size),
+        "shape": full_shape,
+        "dtype": dtype_str,
+        "size": total_size,
     }
-    if np.issubdtype(np_arr.dtype, np.number) and np_arr.size > 0:
-        finite_mask = np.isfinite(np_arr)
-        info["nan_or_inf_count"] = int(np_arr.size - int(np.sum(finite_mask)))
+    if sampled:
+        info["sampled"] = True
+    if np_sample is not None and np.issubdtype(np_sample.dtype, np.number) and np_sample.size > 0:
+        finite_mask = np.isfinite(np_sample)
+        info["nan_or_inf_count"] = int(np_sample.size - int(np.sum(finite_mask)))
         if np.any(finite_mask):
-            finite_vals = np_arr[finite_mask]
+            finite_vals = np_sample[finite_mask]
             info["min"] = float(np.min(finite_vals))
             info["max"] = float(np.max(finite_vals))
-        if np.issubdtype(np_arr.dtype, np.integer):
-            unique_count = len(np.unique(np_arr))
-            info["unique_values"] = unique_count
+        if np.issubdtype(np_sample.dtype, np.integer):
+            info["unique_values"] = len(np.unique(np_sample))
     return info
 
 
@@ -43,7 +80,7 @@ class DatasetProfile:
 
     @classmethod
     def from_dataset(cls, dataset: Any) -> DatasetProfile:
-        """Build a concise profile without leaking raw records."""
+        """Build a concise profile without leaking raw records or consuming streams."""
         if dataset is None:
             return cls(kind="none", summary={})
         if isinstance(dataset, tuple) and len(dataset) == 2:
@@ -85,8 +122,6 @@ class GeneratedPlan:
     model_name: str
     framework: str = "flax"
     validation_passed: bool = True
-    estimated_params: int | None = None
-    estimated_output_shape: str | None = None
     unified_diff: str = ""
     warnings: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -101,11 +136,14 @@ class GeneratedPlan:
             f"Framework: {html.escape(self.framework)}",
             f"Validated: {'yes' if self.validation_passed else 'no'}",
         ]
-        if self.estimated_params is not None:
-            meta_bits.append(f"Estimated parameters: {self.estimated_params:,}")
-        if self.estimated_output_shape:
-            meta_bits.append(f"Output shape: {html.escape(self.estimated_output_shape)}")
         meta_line = " | ".join(meta_bits)
+        warnings_block = ""
+        if self.warnings:
+            items = "".join(f"<li>{html.escape(str(w))}</li>" for w in self.warnings)
+            warnings_block = (
+                "<ul style='color:#9a3412;font-size:12px;margin:8px 0;padding-left:18px;'>"
+                f"{items}</ul>"
+            )
         diff_block = ""
         if self.unified_diff:
             diff_block = (
@@ -118,6 +156,7 @@ class GeneratedPlan:
             f"<h3 style='margin-top:0;'>Jax Forge preview: {escaped_intent}</h3>"
             f"<p style='font-size:12px;color:#5f6f82;'>{meta_line}</p>"
             f"<p style='color:#3e4c5e;'>{escaped_desc}</p>"
+            f"{warnings_block}"
             f"{diff_block}"
             f"<pre style='background:#fff;border:1px solid #dce3ec;padding:12px;"
             f"border-radius:8px;overflow:auto;'><code>{escaped_code}</code></pre>"

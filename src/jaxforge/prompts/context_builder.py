@@ -139,8 +139,9 @@ class ContextBuilder:
         }
         if allow_diff:
             props["diff"] = {"type": "string"}
+        required = ["intent", "description"] if allow_diff else ["intent", "code", "description"]
         return {
             "type": "object",
             "properties": props,
-            "required": ["intent", "code", "description"],
+            "required": required,
         }
