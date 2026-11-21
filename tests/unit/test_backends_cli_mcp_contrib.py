@@ -258,6 +258,54 @@ class TestBackendsCliMcpContrib:
         assert exec_res["ok"] is True
         assert exec_res["result_repr"] == "6"
 
+        # MCP bounds timeout, rejects save intent, isolates CWD, and respects auto_approve
+        neg_res = tool_run_sandboxed_jax(
+            "def analyze_data(dataset=None): return 1", timeout_seconds=-1
+        )
+        assert neg_res["ok"] is False
+        assert tool_run_sandboxed_jax(
+            "def analyze_data(dataset=None): return 1", timeout_seconds=999
+        )["ok"] is False
+        assert tool_run_sandboxed_jax(
+            "def save_model(model=None, path='x'): return 'x'", intent="save"
+        )["ok"] is False
+        cwd_secret = tmp_path / "secret.npy"
+        import numpy as np
+
+        np.save(cwd_secret, np.array([42]))
+        leak_attempt = tool_run_sandboxed_jax(
+            f"import numpy as np\ndef load_data():\n    return np.load({str(cwd_secret)!r})\n",
+            intent="load_data",
+        )
+        assert leak_attempt["ok"] is False
+
+        # Exporter escapes quotes/triple-quotes in description and blocks keyword package_name
+        import ast
+
+        from jaxforge.exporter import export_project
+
+        with pytest.raises(ValueError, match="non-keyword"):
+            export_project(
+                tmp_path / "bad_kw",
+                "def build_model(rngs): return 1\n",
+                package_name="import",
+            )
+
+        tricky_desc = 'Bad """\nimport os; os.system("id")\n[tool.evil]\nx = "injected'
+        pkg_root = export_project(
+            tmp_path / "safe_pkg",
+            model_code="import equinox as eqx\ndef build_model(key):\n    return 1\n",
+            package_name="safe_pkg",
+            description=tricky_desc,
+            framework="equinox",
+        )
+        init_src = (pkg_root / "src" / "safe_pkg" / "__init__.py").read_text(encoding="utf-8")
+        init_tree = ast.parse(init_src)
+        assert len(init_tree.body) == 3  # docstring Expr, ImportFrom, __all__ Assign only!
+        toml_src = (pkg_root / "pyproject.toml").read_text(encoding="utf-8")
+        assert "\n[tool.evil]" not in toml_src
+        assert "equinox>=0.11.0" in toml_src
+
     def test_jax_gemini_compatibility_shim(self):
         sys.modules.pop("jax_gemini", None)
         with warnings.catch_warnings(record=True) as caught:
