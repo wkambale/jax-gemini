@@ -1,6 +1,6 @@
 # API reference
 
-`jaxforge` exposes top-level session functions (`jf.preview`, `jf.build`, `jf.train`, `jf.explore`, `jf.export_project`) backed by a default `JaxForge` instance, plus the `JaxForge` class for isolated multi-session or server workflows. Backward-compatible `jax_gemini` imports emit a `DeprecationWarning` and alias directly to `JaxForge`.
+`jaxforge` exposes top-level session functions (`jf.preview`, `jf.execute_plan`, `jf.build`, `jf.train`, `jf.explore`, `jf.export_project`) backed by a default `JaxForge` instance, plus the `JaxForge` class for isolated multi-session or server workflows. Backward-compatible `jax_gemini` imports emit a `DeprecationWarning` and alias directly to `JaxForge`.
 
 ---
 
@@ -16,6 +16,7 @@ Atomically validates and applies updates on `JaxForgeConfig`.
 - `base_url` *(str | None)*: Optional HTTP(S) base URL for Ollama, vLLM, or custom proxies.
 - `framework` *(str)*: `"flax"`, `"equinox"`, or `"auto"` (Default: `"flax"`).
 - `execution_backend` *(str)*: `"thread"`, `"subprocess"`, `"docker"`, `"e2b"`, or `"modal"` (Default: `"thread"`).
+- `docker_image` *(str)*: Container image tag used when `execution_backend="docker"` (Default: `"jaxforge-sandbox:latest"`).
 - `max_memory_mb` *(int | None)*: Memory limit for `subprocess` and `docker` backends (Default: `None`).
 - `auto_approve` *(bool)*: Require explicit `approve=` callback when `False` (Default: `True`).
 - `temperature` *(float)*: Sampling temperature in `[0.0, 1.0]` (Default: `0.2`).
@@ -29,7 +30,7 @@ Atomically validates and applies updates on `JaxForgeConfig`.
 
 ### `jf.preview(prompt: str, intent: str | None = None, dataset: Any = None, diff_mode: bool = False) -> GeneratedPlan`
 
-Generates and AST-validates code without executing it, returning a `GeneratedPlan` with optional unified diffs and Jupyter HTML rendering. Use `agent.execute_plan(plan, ...)` to execute after approval.
+Generates and AST-validates code without executing it, returning a `GeneratedPlan` with optional `unified_diff` text and Jupyter HTML rendering. Use `jf.execute_plan(plan, ...)` (or `agent.execute_plan(plan, ...)` on an explicit session) to execute after approval.
 
 ---
 

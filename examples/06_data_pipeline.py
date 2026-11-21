@@ -1,26 +1,31 @@
+"""Dataset profiling and sandboxed data-pipeline example with Jax Forge."""
+
+import os
+
 import numpy as np
 
 import jaxforge as jf
+from jaxforge.plan import DatasetProfile
 
 
-def main():
-    print("Setting up Jax Gemini Config...")
-    # Using a fake key for local execution testing since actual key relies on user's env
+def main() -> None:
+    print("Configuring Jax Forge data pipeline...")
     jf.config.set({"model_name": "gemini-3.1-pro"})
 
-    print("Generating synthetic data...")
-    _ = np.random.randn(100, 2)
+    rng = np.random.default_rng(0)
+    features = rng.standard_normal((100, 4), dtype=np.float32)
+    labels = rng.integers(0, 2, size=(100,))
 
-    # We will just print the prompts to show end to end capability.
-    # Since we don't have the API key in the automated runner environment,
-    # we just run pytest for actual verification, but this serves as a documented example.
+    profile = DatasetProfile.from_dataset((features, labels))
+    print("Dataset profile:\n" + profile.to_prompt_text())
 
-    print("Building Data Pipeline...")
-    try:
-        _ = jf.load_data("Load a synthetic dataset of 100 rows and 2 columns from memory")
-        print("Data loaded successfully.")
-    except Exception as e:
-        print(f"Skipping actual API call due to missing key: {e}")
+    if not os.environ.get("GEMINI_API_KEY"):
+        print("Set GEMINI_API_KEY to run LLM-generated load_data and analyze_data steps.")
+        return
+
+    loaded = jf.load_data("Synthesize a normalized dataset of 100 rows and 4 float32 columns")
+    summary = jf.analyze_data("Compute per-column mean and standard deviation", dataset=loaded)
+    print("Analysis summary:", summary)
 
 
 if __name__ == "__main__":

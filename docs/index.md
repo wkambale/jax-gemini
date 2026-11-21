@@ -98,7 +98,7 @@ jf.config.set({"model_name": "anthropic:claude-sonnet-4-5"})
 plan = jf.preview("Build a 4-layer MLP for 28x28 digit classification")
 print(plan.code)
 
-model = jf._default_agent.execute_plan(plan)
+model = jf.execute_plan(plan)
 jf.export_project("./exported_classifier", package_name="digit_classifier")
 ```
 

@@ -4,16 +4,18 @@ This guide walks through installing `jaxforge` (**Jax Forge**), choosing an LLM 
 
 ## Prerequisites
 
-Install version `0.2.0` from [PyPI](https://pypi.org/project/jaxforge/0.2.0/):
+Install `jaxforge` from [PyPI](https://pypi.org/project/jaxforge/):
 
 ```bash
 pip install jaxforge
 ```
 
-Optional extras add plotting, provider SDKs, Equinox/Grain/Safetensors, remote sandboxes, or MCP support:
+Optional extras add Google GenAI or LiteLLM SDKs, plotting, Equinox/Grain/Safetensors, remote sandboxes, or MCP support:
 
 ```bash
-pip install "jaxforge[viz,equinox,grain,safetensors]"
+pip install "jaxforge[google,litellm,viz]"
+pip install "jaxforge[equinox,grain,safetensors]"
+pip install "jaxforge[e2b,modal,mcp]"
 ```
 
 Configure credentials for Google Gemini, OpenAI, Anthropic, OpenRouter, or point `base_url` at local Ollama:
@@ -36,7 +38,7 @@ plan = jf.preview(
     "Design a CNN for 32x32 RGB image classification using two convolutional blocks and dense heads."
 )
 print(plan.code)
-model = jf._default_agent.execute_plan(plan)
+model = jf.execute_plan(plan)
 ```
 
 ## Build, refine, and inspect

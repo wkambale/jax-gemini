@@ -63,10 +63,10 @@ Setting `fast_model_name` enables `RouterLLM`, which uses the primary `model_nam
 
 ## Token and latency telemetry
 
-Every LLM call records an `LLMUsage` entry tracking provider, model identifier, input tokens, output tokens, and wall-clock latency:
+Every LLM call records an `LLMUsage` entry tracking provider, model identifier, prompt tokens, completion tokens, and wall-clock latency:
 
 ```python
 summary = jf.usage_summary()
 print(summary)
-# {'calls': 2, 'input_tokens': 840, 'output_tokens': 412, 'total_tokens': 1252, 'latency_ms': 920.5}
+# {'calls': 2, 'prompt_tokens': 840, 'completion_tokens': 412, 'total_tokens': 1252, 'total_latency_ms': 920.5}
 ```
