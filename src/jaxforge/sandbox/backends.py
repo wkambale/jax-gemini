@@ -322,7 +322,7 @@ class SubprocessSandboxBackend(ExecutionBackend):
             "if mem_mb:\n"
             "    limit = int(mem_mb) * 1024 * 1024\n"
             "    applied = False\n"
-            "    for rlim_name in ('RLIMIT_AS', 'RLIMIT_DATA', 'RLIMIT_RSS'):\n"
+            "    for rlim_name in ('RLIMIT_DATA', 'RLIMIT_RSS', 'RLIMIT_AS'):\n"
             "        rlim = getattr(resource, rlim_name, None)\n"
             "        if rlim is None:\n"
             "            continue\n"
@@ -377,6 +377,7 @@ class SubprocessSandboxBackend(ExecutionBackend):
                         "PATH": os.environ.get("PATH", ""),
                         "HOME": tmp,
                         "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+                        "XLA_PYTHON_CLIENT_PREALLOCATE": "false",
                     },
                 )
             except subprocess.TimeoutExpired as e:

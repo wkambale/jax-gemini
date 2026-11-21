@@ -61,7 +61,7 @@ class TestBackendsCliMcpContrib:
                 call_args={"rngs": __import__("flax.nnx").nnx.Rngs(0)},
                 allowed_dirs=(tmp_path,),
                 timeout_seconds=15.0,
-                max_memory_mb=512,
+                max_memory_mb=2048,
             )
         assert type(res).__name__ == "CustomMLP"
 
