@@ -166,3 +166,41 @@ class TestCodeValidator:
         ):
             with pytest.raises(JaxForgeValidationError):
                 CodeValidator.validate(bad, "build")
+
+    def test_finally_async_and_definition_time_calls_blocked(self):
+        # Safe @jax.jit, @dataclass(frozen=True), and eqx.field(static=True) succeed
+        good = (
+            "from dataclasses import dataclass, field\n"
+            "import jax\n"
+            "@dataclass(frozen=True)\n"
+            "class Cfg:\n"
+            "    dim: int = field(default=8)\n"
+            "@jax.jit\n"
+            "def helper(x):\n"
+            "    return x\n"
+            "def build_model(rngs, units=16):\n"
+            "    return units\n"
+        )
+        CodeValidator.validate(good, "build")
+
+        bad_snippets = [
+            "def build_model(rngs):\n    try:\n        return 1\n    finally:\n        pass\n",
+            "def build_model(rngs):\n    async def inner():\n        return 1\n    return 1\n",
+            "@print\ndef build_model(rngs):\n    return 1\n",
+            "@jax.jit(print(1))\ndef build_model(rngs):\n    return 1\n",
+            "def build_model(rngs, x=print('hi')):\n    return 1\n",
+            "class M:\n    bad = print('side-effect')\ndef build_model(rngs):\n    return 1\n",
+            "class M(int(1)):\n    pass\ndef build_model(rngs):\n    return 1\n",
+            "class M:\n    while False:\n        pass\ndef build_model(rngs):\n    return 1\n",
+        ]
+        import sys
+
+        if sys.version_info >= (3, 11):
+            bad_snippets.append(
+                "def build_model(rngs):\n"
+                "    try:\n        return 1\n    except* ValueError:\n        return 2\n"
+            )
+
+        for snippet in bad_snippets:
+            with pytest.raises(JaxForgeValidationError):
+                CodeValidator.validate(snippet, "build")

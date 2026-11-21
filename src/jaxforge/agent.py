@@ -604,11 +604,24 @@ class JaxForge:
         self._current_model = result
         return result
 
-    def load_data(self, prompt: str, dry_run: bool = False) -> Any:
+    def load_data(
+        self,
+        prompt: str,
+        dry_run: bool = False,
+        approve: ApprovalCallback | None = None,
+    ) -> Any:
         """Load or generate a dataset based on natural language description."""
-        return self._generate_and_execute(prompt, intent="load_data", dry_run=dry_run)
+        return self._generate_and_execute(
+            prompt, intent="load_data", dry_run=dry_run, approve=approve
+        )
 
-    def preprocess_data(self, prompt: str, dataset: Any, dry_run: bool = False) -> Any:
+    def preprocess_data(
+        self,
+        prompt: str,
+        dataset: Any,
+        dry_run: bool = False,
+        approve: ApprovalCallback | None = None,
+    ) -> Any:
         """Preprocess a given dataset based on natural language instruction."""
         return self._generate_and_execute(
             prompt,
@@ -616,9 +629,16 @@ class JaxForge:
             runtime_args={"dataset": dataset},
             dataset=dataset,
             dry_run=dry_run,
+            approve=approve,
         )
 
-    def analyze_data(self, prompt: str, dataset: Any, dry_run: bool = False) -> Any:
+    def analyze_data(
+        self,
+        prompt: str,
+        dataset: Any,
+        dry_run: bool = False,
+        approve: ApprovalCallback | None = None,
+    ) -> Any:
         """Analyze a given dataset and return computed summary statistics."""
         return self._generate_and_execute(
             prompt,
@@ -626,9 +646,16 @@ class JaxForge:
             runtime_args={"dataset": dataset},
             dataset=dataset,
             dry_run=dry_run,
+            approve=approve,
         )
 
-    def visualize_data(self, prompt: str, dataset: Any, dry_run: bool = False) -> Any:
+    def visualize_data(
+        self,
+        prompt: str,
+        dataset: Any,
+        dry_run: bool = False,
+        approve: ApprovalCallback | None = None,
+    ) -> Any:
         """Visualize a given dataset by generating confined plots."""
         return self._generate_and_execute(
             prompt,
@@ -636,6 +663,7 @@ class JaxForge:
             runtime_args={"dataset": dataset},
             dataset=dataset,
             dry_run=dry_run,
+            approve=approve,
         )
 
     def run(
@@ -670,14 +698,14 @@ class JaxForge:
                 raise JaxForgeCheckpointError("Loading a model requires a checkpoint 'name'.")
             return self.load(name, approve=approve)
         if intent == "load_data":
-            return self.load_data(prompt)
+            return self.load_data(prompt, approve=approve)
         if dataset is None:
             raise JaxForgeIntentError(f"Intent '{intent}' requires a 'dataset' argument.")
         if intent == "preprocess_data":
-            return self.preprocess_data(prompt, dataset)
+            return self.preprocess_data(prompt, dataset, approve=approve)
         if intent == "analyze_data":
-            return self.analyze_data(prompt, dataset)
-        return self.visualize_data(prompt, dataset)
+            return self.analyze_data(prompt, dataset, approve=approve)
+        return self.visualize_data(prompt, dataset, approve=approve)
 
     async def apreview(
         self, prompt: str, intent: str | None = None, dataset: Any = None
