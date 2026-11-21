@@ -33,6 +33,7 @@ class JaxForgeConfig:
     checkpoint_dir: str = "./jaxforge_checkpoints"
     timeout_seconds: int = 60
     execution_backend: str = "thread"
+    docker_image: str = "jaxforge-sandbox:latest"
     max_memory_mb: int | None = None
     auto_approve: bool = True
     framework: str = "flax"
@@ -104,6 +105,15 @@ class JaxForgeConfig:
             raise JaxForgeConfigError(
                 f"execution_backend must be one of {sorted(SUPPORTED_BACKENDS)}, "
                 f"got {self.execution_backend!r}"
+            )
+        if (
+            not isinstance(self.docker_image, str)
+            or not self.docker_image.strip()
+            or self.docker_image.strip().startswith("-")
+            or any(ch.isspace() or ch == "\x00" for ch in self.docker_image)
+        ):
+            raise JaxForgeConfigError(
+                "docker_image must be a non-empty container image reference without whitespace"
             )
         if not isinstance(self.framework, str) or self.framework not in SUPPORTED_FRAMEWORKS:
             raise JaxForgeConfigError(

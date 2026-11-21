@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-import json
+import base64
+import io
 import os
 import pickle
 import subprocess
@@ -11,15 +12,192 @@ import tempfile
 import threading
 import time
 import traceback
+import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
-from types import FrameType
+from types import FrameType, ModuleType
 from typing import Any
 
-from jaxforge.codegen.validator import CodeValidator
+from jaxforge.codegen.validator import (
+    BANNED_ATTRIBUTES,
+    BANNED_MODULE_PREFIXES,
+    BANNED_NUMPY_ATTRIBUTES,
+    INTENT_ALLOWED_IMPORTS,
+    WHITELIST_IMPORTS,
+    CodeValidator,
+)
 from jaxforge.exceptions import JaxForgeConfigError, JaxForgeExecutionError
 from jaxforge.sandbox.namespace import get_execution_namespace
+
+_RESULT_MARKER = "__JAXFORGE_RESULT_B64__:"
+
+_SAFE_UNPICKLE_BUILTINS = frozenset(
+    {
+        "dict",
+        "list",
+        "tuple",
+        "set",
+        "frozenset",
+        "slice",
+        "complex",
+        "bytes",
+        "bytearray",
+        "str",
+        "int",
+        "float",
+        "bool",
+        "range",
+    }
+)
+_SAFE_UNPICKLE_ROOTS = frozenset(
+    {
+        "numpy",
+        "jax",
+        "jaxlib",
+        "flax",
+        "optax",
+        "equinox",
+        "collections",
+        "types",
+        "functools",
+        "jaxforge_sandbox",
+    }
+)
+
+
+class _RestrictedUnpickler(pickle.Unpickler):
+    """Confined unpickler rejecting arbitrary host callables such as os.system or eval."""
+
+    def find_class(self, module: str, name: str) -> Any:
+        root = module.split(".")[0]
+        if module == "builtins":
+            if name in _SAFE_UNPICKLE_BUILTINS:
+                return super().find_class(module, name)
+            raise pickle.UnpicklingError(f"Blocked unpickling of builtin '{name}'.")
+        if root == "_codecs" and name == "encode":
+            return super().find_class(module, name)
+        if root in _SAFE_UNPICKLE_ROOTS and not any(
+            module == b or module.startswith(f"{b}.") for b in BANNED_MODULE_PREFIXES
+        ):
+            return super().find_class(module, name)
+        raise pickle.UnpicklingError(
+            f"Blocked unpickling of untrusted class '{module}.{name}'."
+        )
+
+
+def _safe_pickle_loads(data: bytes, code: str = "", intent: str = "build") -> Any:
+    """Deserialize sandbox output safely, registering custom sandbox classes when needed."""
+    needs_sandbox_mod = b"jaxforge_sandbox" in data
+    prev_mod = sys.modules.get("jaxforge_sandbox")
+    try:
+        if needs_sandbox_mod and code:
+            ns = get_execution_namespace(intent=intent)
+            mod = ModuleType("jaxforge_sandbox")
+            mod.__dict__.update(ns)
+            sys.modules["jaxforge_sandbox"] = mod
+            exec(code, mod.__dict__)
+        return _RestrictedUnpickler(io.BytesIO(data)).load()
+    except Exception as e:
+        raise JaxForgeExecutionError(
+            f"Failed to deserialize sandbox result safely: {e}",
+            code=code,
+        ) from e
+    finally:
+        if needs_sandbox_mod:
+            if prev_mod is None:
+                sys.modules.pop("jaxforge_sandbox", None)
+            else:
+                sys.modules["jaxforge_sandbox"] = prev_mod
+
+
+def _encode_remote_payload(
+    code: str,
+    intent: str,
+    fn_name: str,
+    call_args: dict[str, Any],
+) -> str:
+    allowed = sorted(INTENT_ALLOWED_IMPORTS.get(intent, WHITELIST_IMPORTS))
+    try:
+        raw = pickle.dumps(
+            {
+                "code": code,
+                "intent": intent,
+                "fn_name": fn_name,
+                "call_args": call_args,
+                "allowed_imports": allowed,
+                "banned_prefixes": sorted(BANNED_MODULE_PREFIXES),
+                "banned_attrs": sorted(BANNED_ATTRIBUTES | BANNED_NUMPY_ATTRIBUTES),
+            }
+        )
+    except Exception as e:
+        raise JaxForgeExecutionError(
+            f"Runtime arguments cannot be serialized for isolated backend: {e}",
+            code=code,
+        ) from e
+    return base64.b64encode(raw).decode("ascii")
+
+
+def _build_self_contained_runner(payload_b64: str, out_file: str | None = None) -> str:
+    """Build a self-contained Python script requiring no preinstalled jaxforge package."""
+    sink_stmt = (
+        f"open({out_file!r}, 'wb').write(_out_bytes)\n"
+        if out_file
+        else f"print({_RESULT_MARKER!r} + base64.b64encode(_out_bytes).decode('ascii'))\n"
+    )
+    return (
+        "import base64, builtins, pickle, sys, types\n"
+        f"_payload = pickle.loads(base64.b64decode({payload_b64!r}))\n"
+        "_allowed = set(_payload['allowed_imports'])\n"
+        "_banned_prefixes = tuple(_payload['banned_prefixes'])\n"
+        "_banned_attrs = set(_payload['banned_attrs'])\n"
+        "def _safe_imp(name, globals=None, locals=None, fromlist=(), level=0):\n"
+        "    if level != 0:\n"
+        "        raise ImportError('Relative imports are not allowed.')\n"
+        "    root = name.split('.')[0]\n"
+        "    _bad = any(name == p or name.startswith(p + '.') for p in _banned_prefixes)\n"
+        "    if root not in _allowed or _bad:\n"
+        "        raise ImportError(f'Import {name!r} is not allowed.')\n"
+        "    for sym in (fromlist or ()):\n"
+        "        if sym == '*' or sym in _banned_attrs:\n"
+        "            raise ImportError(f'Import {sym!r} is not allowed.')\n"
+        "    return builtins.__import__(name, globals, locals, fromlist, level)\n"
+        "_safe_builtins = {\n"
+        "    k: getattr(builtins, k) for k in (\n"
+        "        'print','range','len','enumerate','zip','map','filter','sorted','reversed',\n"
+        "        'min','max','sum','abs','round','int','float','str','bool','list','dict',\n"
+        "        'tuple','set','isinstance','hasattr','repr','True','False','None',\n"
+        "        '__build_class__','Exception','ValueError','TypeError','RuntimeError',\n"
+        "        'KeyError','PermissionError'\n"
+        "    ) if hasattr(builtins, k)\n"
+        "}\n"
+        "_safe_builtins['__import__'] = _safe_imp\n"
+        "_mod = types.ModuleType('jaxforge_sandbox')\n"
+        "_mod.__dict__['__builtins__'] = _safe_builtins\n"
+        "for _alias, _pkg in (('jax','jax'),('jnp','jax.numpy'),('flax','flax'),"
+        "('nnx','flax.nnx'),('optax','optax'),('np','numpy')):\n"
+        "    try:\n"
+        "        _m = __import__(_pkg, fromlist=['*'])\n"
+        "        _mod.__dict__[_alias] = _m\n"
+        "    except ImportError:\n"
+        "        pass\n"
+        "sys.modules['jaxforge_sandbox'] = _mod\n"
+        "exec(_payload['code'], _mod.__dict__)\n"
+        "_res = _mod.__dict__[_payload['fn_name']](**_payload['call_args'])\n"
+        "_out_bytes = pickle.dumps(_res)\n"
+        + sink_stmt
+    )
+
+
+def _decode_stdout_result(stdout_text: str, code: str, intent: str) -> Any:
+    for line in reversed(stdout_text.splitlines()):
+        if line.startswith(_RESULT_MARKER):
+            b64_part = line[len(_RESULT_MARKER) :].strip()
+            return _safe_pickle_loads(base64.b64decode(b64_part), code=code, intent=intent)
+    raise JaxForgeExecutionError(
+        "Isolated sandbox completed without emitting a valid result payload.",
+        code=code,
+    )
 
 
 class _SandboxTimeoutError(BaseException):
@@ -136,21 +314,35 @@ class SubprocessSandboxBackend(ExecutionBackend):
         CodeValidator.validate(code, intent)
         resolved_dirs = [str(Path(d).resolve()) for d in (allowed_dirs or (Path.cwd(),))]
         runner = (
-            "import json, pickle, resource, sys\n"
+            "import pickle, resource, sys, types\n"
             "from pathlib import Path\n"
             "from jaxforge.sandbox.namespace import get_execution_namespace\n"
             "payload = pickle.loads(Path(sys.argv[1]).read_bytes())\n"
             "mem_mb = payload.get('max_memory_mb')\n"
             "if mem_mb:\n"
             "    limit = int(mem_mb) * 1024 * 1024\n"
-            "    try:\n"
-            "        resource.setrlimit(resource.RLIMIT_AS, (limit, limit))\n"
-            "    except (ValueError, OSError):\n"
-            "        pass\n"
+            "    applied = False\n"
+            "    for rlim_name in ('RLIMIT_AS', 'RLIMIT_DATA', 'RLIMIT_RSS'):\n"
+            "        rlim = getattr(resource, rlim_name, None)\n"
+            "        if rlim is None:\n"
+            "            continue\n"
+            "        try:\n"
+            "            _, hard = resource.getrlimit(rlim)\n"
+            "            eff = limit if hard == resource.RLIM_INFINITY else min(limit, hard)\n"
+            "            resource.setrlimit(rlim, (eff, hard))\n"
+            "            applied = True\n"
+            "            break\n"
+            "        except (ValueError, OSError):\n"
+            "            continue\n"
+            "    if not applied:\n"
+            "        sys.stderr.write('JAXFORGE_RLIMIT_UNSUPPORTED\\n')\n"
             "ns = get_execution_namespace(intent=payload['intent'], "
             "allowed_dirs=tuple(payload['allowed_dirs']))\n"
-            "exec(payload['code'], ns)\n"
-            "res = ns[payload['fn_name']](**payload['call_args'])\n"
+            "mod = types.ModuleType('jaxforge_sandbox')\n"
+            "mod.__dict__.update(ns)\n"
+            "sys.modules['jaxforge_sandbox'] = mod\n"
+            "exec(payload['code'], mod.__dict__)\n"
+            "res = mod.__dict__[payload['fn_name']](**payload['call_args'])\n"
             "Path(sys.argv[2]).write_bytes(pickle.dumps(res))\n"
         )
         with tempfile.TemporaryDirectory(prefix="jaxforge_subproc_") as tmp:
@@ -194,19 +386,31 @@ class SubprocessSandboxBackend(ExecutionBackend):
                     attempts=1,
                 ) from e
 
+            if "JAXFORGE_RLIMIT_UNSUPPORTED" in proc.stderr:
+                warnings.warn(
+                    "OS memory rlimit could not be enforced on this platform.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
             if proc.returncode != 0:
                 raise JaxForgeExecutionError(
                     f"Subprocess execution failed (exit {proc.returncode}):\n{proc.stderr}",
                     code=code,
                     attempts=1,
                 )
-            return pickle.loads(out_path.read_bytes())  # noqa: S301
+            if not out_path.exists():
+                raise JaxForgeExecutionError(
+                    "Subprocess exited cleanly without writing output payload.",
+                    code=code,
+                    attempts=1,
+                )
+            return _safe_pickle_loads(out_path.read_bytes(), code=code, intent=intent)
 
 
 class DockerSandboxBackend(ExecutionBackend):
     """Isolated container backend running validated code in a hardened Python container."""
 
-    def __init__(self, image: str = "python:3.12-slim"):
+    def __init__(self, image: str = "jaxforge-sandbox:latest"):
         self._image = image
 
     def build_command(
@@ -214,26 +418,42 @@ class DockerSandboxBackend(ExecutionBackend):
         work_dir: Path,
         timeout_seconds: float,
         max_memory_mb: int | None,
+        allowed_dirs: tuple[Path | str, ...] | None = None,
     ) -> list[str]:
         mem_flag = f"{max_memory_mb or 2048}m"
-        return [
+        cmd = [
             "docker",
             "run",
             "--rm",
             "--network=none",
             "--read-only",
+            "--tmpfs",
+            "/tmp:rw,noexec,nosuid,size=256m",  # noqa: S108
             "--cap-drop=ALL",
             "--security-opt=no-new-privileges",
             f"--memory={mem_flag}",
             f"--stop-timeout={max(1, int(timeout_seconds))}",
+            "-e",
+            "HOME=/tmp",
+            "-e",
+            "XLA_PYTHON_CLIENT_PREALLOCATE=false",
             "-v",
             f"{work_dir}:/workspace:rw",
-            "-w",
-            "/workspace",
-            self._image,
-            "python",
-            "/workspace/run_sandbox.py",
         ]
+        for extra_dir in allowed_dirs or ():
+            resolved = Path(extra_dir).resolve()
+            if resolved.exists():
+                cmd.extend(["-v", f"{resolved}:{resolved}:rw"])
+        cmd.extend(
+            [
+                "-w",
+                "/workspace",
+                self._image,
+                "python",
+                "/workspace/run_sandbox.py",
+            ]
+        )
+        return cmd
 
     def execute(
         self,
@@ -246,24 +466,15 @@ class DockerSandboxBackend(ExecutionBackend):
         max_memory_mb: int | None = None,
     ) -> Any:
         CodeValidator.validate(code, intent)
+        payload_b64 = _encode_remote_payload(code, intent, fn_name, call_args)
         with tempfile.TemporaryDirectory(prefix="jaxforge_docker_") as tmp:
             work_dir = Path(tmp)
-            script = (
-                "import json, pickle\n"
-                "from jaxforge.sandbox.namespace import get_execution_namespace\n"
-                "args = pickle.loads(open('/workspace/args.pkl', 'rb').read())\n"
-                "ns = get_execution_namespace(intent="
-                f"{intent!r}"
-                ", allowed_dirs=('/workspace',))\n"
-                f"code = {code!r}\n"
-                "exec(code, ns)\n"
-                f"res = ns[{fn_name!r}](**args)\n"
-                "with open('/workspace/out.pkl', 'wb') as f:\n"
-                "    f.write(pickle.dumps(res))\n"
-            )
-            (work_dir / "args.pkl").write_bytes(pickle.dumps(call_args))
+            out_file = "/workspace/out.pkl"
+            script = _build_self_contained_runner(payload_b64, out_file=out_file)
             (work_dir / "run_sandbox.py").write_text(script, encoding="utf-8")
-            cmd = self.build_command(work_dir, timeout_seconds, max_memory_mb)
+            cmd = self.build_command(
+                work_dir, timeout_seconds, max_memory_mb, allowed_dirs=allowed_dirs
+            )
             try:
                 proc = subprocess.run(  # noqa: S603
                     cmd,
@@ -287,7 +498,14 @@ class DockerSandboxBackend(ExecutionBackend):
                     code=code,
                     attempts=1,
                 )
-            return pickle.loads((work_dir / "out.pkl").read_bytes())  # noqa: S301
+            host_out = work_dir / "out.pkl"
+            if not host_out.exists():
+                raise JaxForgeExecutionError(
+                    "Docker container exited without producing output payload.",
+                    code=code,
+                    attempts=1,
+                )
+            return _safe_pickle_loads(host_out.read_bytes(), code=code, intent=intent)
 
 
 class E2BSandboxBackend(ExecutionBackend):
@@ -311,24 +529,38 @@ class E2BSandboxBackend(ExecutionBackend):
                 "Install with: pip install 'jaxforge[e2b]'."
             ) from e
         CodeValidator.validate(code, intent)
+        payload_b64 = _encode_remote_payload(code, intent, fn_name, call_args)
+        runner_script = _build_self_contained_runner(payload_b64, out_file=None)
         with Sandbox(timeout=int(timeout_seconds)) as sandbox:
-            payload = (
-                f"{code}\n"
-                f"_res = {fn_name}(**{json.dumps(call_args, default=str)})\n"
-                "print(repr(_res))\n"
-            )
-            execution = sandbox.run_code(payload)
-            if execution.error:
+            execution = sandbox.run_code(runner_script)
+            if getattr(execution, "error", None):
                 raise JaxForgeExecutionError(
                     f"E2B sandbox error: {execution.error.name}: {execution.error.value}",
                     code=code,
                     attempts=1,
                 )
-            return execution.text
+            logs = getattr(execution, "logs", None)
+            stdout_chunks = getattr(logs, "stdout", None) if logs is not None else None
+            stdout_text = (
+                "\n".join(stdout_chunks)
+                if isinstance(stdout_chunks, list)
+                else str(getattr(execution, "text", "") or "")
+            )
+            return _decode_stdout_result(stdout_text, code=code, intent=intent)
 
 
 class ModalSandboxBackend(ExecutionBackend):
     """Serverless remote GPU/TPU sandbox backend delegating execution to Modal."""
+
+    _cached_image: Any = None
+
+    @classmethod
+    def _get_image(cls, modal_mod: Any) -> Any:
+        if cls._cached_image is None:
+            cls._cached_image = modal_mod.Image.debian_slim().pip_install(
+                "jax", "flax", "optax", "numpy"
+            )
+        return cls._cached_image
 
     def execute(
         self,
@@ -348,15 +580,18 @@ class ModalSandboxBackend(ExecutionBackend):
                 "Install with: pip install 'jaxforge[modal]'."
             ) from e
         CodeValidator.validate(code, intent)
+        payload_b64 = _encode_remote_payload(code, intent, fn_name, call_args)
+        runner_script = _build_self_contained_runner(payload_b64, out_file=None)
         app = modal.App.lookup("jaxforge-sandbox", create_if_missing=True)
-        image = modal.Image.debian_slim().pip_install("jax", "flax", "optax", "numpy")
+        image = self._get_image(modal)
         sb = modal.Sandbox.create(
             "python",
             "-c",
-            f"{code}\nprint(repr({fn_name}(**{json.dumps(call_args, default=str)})))",
+            runner_script,
             app=app,
             image=image,
             timeout=int(timeout_seconds),
+            block_network=True,
         )
         sb.wait()
         if sb.returncode != 0:
@@ -365,21 +600,26 @@ class ModalSandboxBackend(ExecutionBackend):
                 code=code,
                 attempts=1,
             )
-        return sb.stdout.read().strip()
+        return _decode_stdout_result(sb.stdout.read(), code=code, intent=intent)
 
 
-def create_backend(name: str = "thread") -> ExecutionBackend:
+def create_backend(
+    name: str = "thread",
+    docker_image: str = "jaxforge-sandbox:latest",
+) -> ExecutionBackend:
     """Instantiate an ExecutionBackend by configured name."""
+    if name == "docker":
+        return DockerSandboxBackend(image=docker_image)
     mapping: dict[str, Callable[[], ExecutionBackend]] = {
         "thread": ThreadSandboxBackend,
         "subprocess": SubprocessSandboxBackend,
-        "docker": DockerSandboxBackend,
         "e2b": E2BSandboxBackend,
         "modal": ModalSandboxBackend,
     }
     factory = mapping.get(name)
     if factory is None:
+        all_names = sorted([*mapping.keys(), "docker"])
         raise JaxForgeConfigError(
-            f"Unknown execution_backend '{name}'. Expected one of: {sorted(mapping)}."
+            f"Unknown execution_backend '{name}'. Expected one of: {all_names}."
         )
     return factory()

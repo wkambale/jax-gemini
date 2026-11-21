@@ -29,22 +29,103 @@ from jaxforge.sandbox.backends import (
 
 class TestBackendsCliMcpContrib:
     def test_subprocess_docker_e2b_modal_backends(self, tmp_path):
-        sub = SubprocessSandboxBackend()
-        res = sub.execute(
-            code="def build_model():\n    return {'layers': [4, 2]}\n",
-            intent="build",
-            fn_name="build_model",
-            call_args={},
-            allowed_dirs=(tmp_path,),
-            timeout_seconds=10.0,
-            max_memory_mb=None,
+        import pickle
+        from types import ModuleType
+        from unittest.mock import MagicMock, patch
+
+        import numpy as np
+
+        from jaxforge.config import JaxForgeConfig
+        from jaxforge.exceptions import JaxForgeExecutionError
+        from jaxforge.sandbox.backends import (
+            _build_self_contained_runner,
+            _decode_stdout_result,
+            _encode_remote_payload,
+            _safe_pickle_loads,
         )
-        assert res == {"layers": [4, 2]}
 
-        docker_cmd = DockerSandboxBackend().build_command(tmp_path, 30, 1024)
+        sub = SubprocessSandboxBackend()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            res = sub.execute(
+                code=(
+                    "import flax.nnx as nnx\n"
+                    "class CustomMLP(nnx.Module):\n"
+                    "    def __init__(self, rngs):\n"
+                    "        self.l = nnx.Linear(4, 2, rngs=rngs)\n"
+                    "def build_model(rngs):\n"
+                    "    return CustomMLP(rngs)\n"
+                ),
+                intent="build",
+                fn_name="build_model",
+                call_args={"rngs": __import__("flax.nnx").nnx.Rngs(0)},
+                allowed_dirs=(tmp_path,),
+                timeout_seconds=15.0,
+                max_memory_mb=512,
+            )
+        assert type(res).__name__ == "CustomMLP"
+
+        # Restricted unpickler blocks host callables such as os.system
+        malicious_bytes = b"cos\nsystem\n(S'id'\ntR."
+        with pytest.raises(JaxForgeExecutionError, match="Blocked unpickling"):
+            _safe_pickle_loads(malicious_bytes)
+
+        # Self-contained remote runner handles None, bool, and NumPy arrays and returns real types
+        train_code = (
+            "def train_model(dataset=None, epochs=5, learning_rate=0.001):\n"
+            "    return ('trained', {'loss': 0.1, 'seen_none': dataset is None, 'ep': epochs})\n"
+        )
+        b64 = _encode_remote_payload(
+            train_code, "train", "train_model", {"dataset": None, "epochs": 3}
+        )
+        script = _build_self_contained_runner(b64, out_file=None)
+        proc = __import__("subprocess").run(
+            [sys.executable, "-c", script], capture_output=True, text=True, check=True
+        )
+        decoded = _decode_stdout_result(proc.stdout, code=train_code, intent="train")
+        assert decoded == ("trained", {"loss": 0.1, "seen_none": True, "ep": 3})
+
+        # Docker command includes /tmp tmpfs, custom docker_image, and executes via runner
+        cfg = JaxForgeConfig(docker_image="my-org/jaxforge:0.2")
+        assert cfg.docker_image == "my-org/jaxforge:0.2"
+        with pytest.raises(JaxForgeConfigError, match="docker_image"):
+            cfg.set({"docker_image": "-bad-flag"})
+
+        docker_be = create_backend("docker", docker_image="my-org/jaxforge:0.2")
+        assert isinstance(docker_be, DockerSandboxBackend)
+        docker_cmd = docker_be.build_command(tmp_path, 30, 1024, allowed_dirs=(tmp_path,))
         assert "--network=none" in docker_cmd
-        assert "--memory=1024m" in docker_cmd
+        assert "--tmpfs" in docker_cmd
+        assert "my-org/jaxforge:0.2" in docker_cmd
 
+        real_subproc_run = __import__("subprocess").run
+
+        def _fake_docker_run(cmd, **kwargs):
+            pathlib_mod = __import__("pathlib")
+            vol_arg = next(a for a in cmd if a.endswith(":/workspace:rw"))
+            host_ws = pathlib_mod.Path(vol_arg.split(":/workspace:rw")[0])
+            out_target = repr(str(host_ws / "out.pkl"))
+            py_src = (
+                (host_ws / "run_sandbox.py")
+                .read_text(encoding="utf-8")
+                .replace("'/workspace/out.pkl'", out_target)
+            )
+            real_subproc_run([sys.executable, "-c", py_src], check=True)
+            return MagicMock(returncode=0, stderr="")
+
+        with patch("jaxforge.sandbox.backends.subprocess.run", side_effect=_fake_docker_run):
+            d_res = docker_be.execute(
+                train_code,
+                "train",
+                "train_model",
+                {"dataset": np.ones((2, 2)), "epochs": 2},
+                (tmp_path,),
+                10.0,
+                512,
+            )
+            assert d_res[0] == "trained" and d_res[1]["seen_none"] is False
+
+        # Missing optional packages raise JaxForgeConfigError cleanly
         with pytest.raises(JaxForgeConfigError, match="e2b"):
             E2BSandboxBackend().execute(
                 "def build_model(): pass", "build", "build_model", {}, None, 5
@@ -53,6 +134,57 @@ class TestBackendsCliMcpContrib:
             ModalSandboxBackend().execute(
                 "def build_model(): pass", "build", "build_model", {}, None, 5
             )
+
+        # Mocked E2B and Modal backends execute self-contained runner and deserialize objects
+        fake_e2b = ModuleType("e2b_code_interpreter")
+
+        class _FakeE2BSandbox:
+            def __init__(self, timeout=5):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def run_code(self, code_str):
+                out = __import__("subprocess").run(
+                    [sys.executable, "-c", code_str], capture_output=True, text=True, check=True
+                )
+                return MagicMock(error=None, logs=MagicMock(stdout=[out.stdout.strip()]), text="")
+
+        fake_e2b.Sandbox = _FakeE2BSandbox  # type: ignore[attr-defined]
+        with patch.dict(sys.modules, {"e2b_code_interpreter": fake_e2b}):
+            e2b_out = E2BSandboxBackend().execute(
+                train_code, "train", "train_model", {"dataset": None, "epochs": 4}, None, 10
+            )
+            assert e2b_out == ("trained", {"loss": 0.1, "seen_none": True, "ep": 4})
+
+        fake_modal = ModuleType("modal")
+        created_kwargs: dict[str, object] = {}
+
+        def _fake_modal_create(*args, **kwargs):
+            created_kwargs.update(kwargs)
+            out = __import__("subprocess").run(
+                [sys.executable, "-c", args[2]], capture_output=True, text=True, check=True
+            )
+            sb = MagicMock(returncode=0)
+            sb.stdout.read.return_value = out.stdout
+            return sb
+
+        fake_modal.App = MagicMock()  # type: ignore[attr-defined]
+        fake_modal.Image = MagicMock()  # type: ignore[attr-defined]
+        fake_modal.Sandbox = MagicMock(create=_fake_modal_create)  # type: ignore[attr-defined]
+        ModalSandboxBackend._cached_image = None
+        with patch.dict(sys.modules, {"modal": fake_modal}):
+            modal_out = ModalSandboxBackend().execute(
+                train_code, "train", "train_model", {"dataset": None, "epochs": 7}, None, 10
+            )
+            assert modal_out == ("trained", {"loss": 0.1, "seen_none": True, "ep": 7})
+            assert created_kwargs.get("block_network") is True
+            assert isinstance(pickle.dumps(modal_out), bytes)
+
         with pytest.raises(JaxForgeConfigError, match="Unknown execution_backend"):
             create_backend("invalid")
 
