@@ -76,9 +76,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"# Intent: {plan.intent} ({plan.provider}:{plan.model_name})\n")
         print(plan.code)
         if args.export:
+            from jaxforge.exceptions import JaxForgeValidationError
             from jaxforge.exporter import export_project
 
-            export_project(args.export, model_code=plan.code)
+            if plan.intent != "build":
+                raise JaxForgeValidationError(
+                    f"Cannot export standalone model package from '{plan.intent}' intent; "
+                    "pass a 'build' prompt.",
+                    code=plan.code,
+                )
+            export_project(
+                args.export,
+                model_code=plan.code,
+                description=plan.description,
+                framework=plan.framework,
+            )
             print(f"\nExported standalone project to: {args.export}")
         return 0
 

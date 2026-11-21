@@ -753,15 +753,22 @@ class JaxForge:
         package_name: str = "generated_model",
     ) -> Path:
         """Export the last built, training, and evaluation code as a standalone Python package."""
-        model_code = self._last_build_code or self._last_code
+        model_code = self._last_build_code
         if not model_code:
             raise JaxForgeError("No generated model code available to export. Call build() first.")
+        desc = (
+            str(self._last_response["description"])
+            if self._last_response and "description" in self._last_response
+            else "Standalone JAX model exported by Jax Forge."
+        )
         return write_project_package(
             output_dir=output_dir,
             model_code=model_code,
             train_code=self._last_train_code,
             eval_code=self._last_eval_code,
             package_name=package_name,
+            description=desc,
+            framework=self.config.framework,
         )
 
     def usage_summary(self) -> dict[str, Any]:
