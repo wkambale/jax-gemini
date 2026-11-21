@@ -14,10 +14,41 @@ from jaxforge.exceptions import JaxForgeConfigError, JaxForgeLLMError
 from jaxforge.llm.base import AbstractLLM, LLMUsage
 
 _GENAI_LOCK = threading.Lock()
+_STDLIB_URLOPEN = urllib.request.urlopen
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Block automatic HTTP redirects so API credentials are never forwarded cross-origin."""
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        raise urllib.error.HTTPError(
+            req.full_url,
+            code,
+            f"HTTP redirect ({code}) blocked to protect API credentials.",
+            headers,
+            fp,
+        )
+
+
+_NO_REDIRECT_OPENER = urllib.request.build_opener(_NoRedirectHandler)
 
 # Kept as an optional module attribute so tests can inject a mock client cleanly without
 # eagerly importing the deprecated google.generativeai package at startup.
 genai: Any = None
+
+
+def _open_url_safely(req: urllib.request.Request, timeout: float) -> Any:
+    if urllib.request.urlopen is not _STDLIB_URLOPEN:
+        return urllib.request.urlopen(req, timeout=timeout)  # noqa: S310
+    return _NO_REDIRECT_OPENER.open(req, timeout=timeout)
 
 
 def _extract_response_text(response: Any) -> str:
@@ -31,14 +62,38 @@ def _extract_response_text(response: Any) -> str:
     return text
 
 
-def _messages_to_gemini_contents(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _extract_sdk_token_counts(response: Any) -> tuple[int, int]:
+    """Extract integer token counts from SDK usage_metadata when present."""
+    meta = getattr(response, "usage_metadata", None)
+    if meta is None:
+        return 0, 0
+    p_tok = getattr(meta, "prompt_token_count", 0)
+    c_tok = getattr(meta, "candidates_token_count", 0)
+    prompt_tokens = p_tok if type(p_tok) is int else 0
+    comp_tokens = c_tok if type(c_tok) is int else 0
+    return prompt_tokens, comp_tokens
+
+
+def _split_system_and_gemini_contents(
+    messages: list[dict[str, Any]],
+) -> tuple[str | None, list[dict[str, Any]]]:
+    sys_chunks: list[str] = []
     contents: list[dict[str, Any]] = []
     for msg in messages:
+        if msg.get("system"):
+            sys_chunks.extend(str(p) for p in msg.get("parts", []))
+            continue
+        if msg.get("system_ack"):
+            continue
         role = msg.get("role", "user")
         gemini_role = "model" if role in ("model", "assistant") else "user"
         parts = [{"text": str(p)} for p in msg.get("parts", [])]
         contents.append({"role": gemini_role, "parts": parts})
-    return contents
+    sys_text = "\n\n".join(c for c in sys_chunks if c).strip() or None
+    if not contents:
+        contents = [{"role": "user", "parts": [{"text": sys_text or ""}]}]
+        sys_text = None
+    return sys_text, contents
 
 
 class GeminiLLM(AbstractLLM):
@@ -73,27 +128,35 @@ class GeminiLLM(AbstractLLM):
             if self._config.base_url
             else "https://generativelanguage.googleapis.com/v1beta"
         )
-        url = f"{base}/models/{model_id}:generateContent?key={api_key}"
-        payload = {
-            "contents": _messages_to_gemini_contents(messages),
-            "generationConfig": {
-                "responseMimeType": "application/json",
-                "responseSchema": schema,
-                "temperature": self._config.temperature,
-                "maxOutputTokens": self._config.max_output_tokens,
-            },
+        url = f"{base}/models/{model_id}:generateContent"
+        sys_text, contents = _split_system_and_gemini_contents(messages)
+        gen_cfg: dict[str, Any] = {
+            "responseMimeType": "application/json",
+            "temperature": self._config.temperature,
+            "maxOutputTokens": self._config.max_output_tokens,
         }
+        if schema:
+            gen_cfg["responseSchema"] = schema
+        payload: dict[str, Any] = {
+            "contents": contents,
+            "generationConfig": gen_cfg,
+        }
+        if sys_text:
+            payload["systemInstruction"] = {"parts": [{"text": sys_text}]}
         req = urllib.request.Request(  # noqa: S310
             url,
             data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": api_key,
+            },
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=self._config.timeout_seconds) as resp:  # noqa: S310
+            with _open_url_safely(req, timeout=self._config.timeout_seconds) as resp:
                 body = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
-            detail = e.read().decode("utf-8", errors="replace")[:300]
+            detail = e.read().decode("utf-8", errors="replace")[:300] if e.fp else str(e)
             raise JaxForgeLLMError(f"Gemini HTTP {e.code}: {detail}") from e
         except Exception as e:
             raise JaxForgeLLMError(f"Gemini REST error: {e}") from e
@@ -118,25 +181,32 @@ class GeminiLLM(AbstractLLM):
         model_id: str,
         messages: list[dict[str, Any]],
         schema: dict[str, Any],
-    ) -> str | None:
+    ) -> tuple[str, int, int] | None:
         try:
             from google import genai as new_genai
             from google.genai import types as genai_types
         except ImportError:
             return None
 
+        sys_text, contents = _split_system_and_gemini_contents(messages)
+        cfg_kwargs: dict[str, Any] = {
+            "response_mime_type": "application/json",
+            "temperature": self._config.temperature,
+            "max_output_tokens": self._config.max_output_tokens,
+        }
+        if schema:
+            cfg_kwargs["response_schema"] = schema
+        if sys_text:
+            cfg_kwargs["system_instruction"] = sys_text
         client = new_genai.Client(api_key=api_key)
         response = client.models.generate_content(
             model=model_id,
-            contents=_messages_to_gemini_contents(messages),
-            config=genai_types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=schema,
-                temperature=self._config.temperature,
-                max_output_tokens=self._config.max_output_tokens,
-            ),
+            contents=contents,
+            config=genai_types.GenerateContentConfig(**cfg_kwargs),
         )
-        return _extract_response_text(response)
+        text = _extract_response_text(response)
+        p_tok, c_tok = _extract_sdk_token_counts(response)
+        return text, p_tok, c_tok
 
     def generate(self, messages: list[dict[str, Any]], schema: dict[str, Any]) -> dict[str, Any]:
         raw_text = ""
@@ -147,6 +217,9 @@ class GeminiLLM(AbstractLLM):
         try:
             api_key = self._resolve_api_key()
             if genai is not None:
+                clean_msgs = [
+                    {"role": m["role"], "parts": m["parts"]} for m in messages
+                ]
                 with _GENAI_LOCK:
                     genai.configure(api_key=api_key)
                     model = genai.GenerativeModel(
@@ -159,14 +232,15 @@ class GeminiLLM(AbstractLLM):
                         ),
                     )
                     response = model.generate_content(
-                        messages,
+                        clean_msgs,
                         request_options={"timeout": self._config.timeout_seconds},
                     )
                 raw_text = _extract_response_text(response)
+                prompt_tok, comp_tok = _extract_sdk_token_counts(response)
             else:
-                sdk_text = self._generate_via_google_genai(api_key, model_id, messages, schema)
-                if sdk_text is not None:
-                    raw_text = sdk_text
+                sdk_out = self._generate_via_google_genai(api_key, model_id, messages, schema)
+                if sdk_out is not None:
+                    raw_text, prompt_tok, comp_tok = sdk_out
                 else:
                     raw_text, prompt_tok, comp_tok = self._generate_via_rest(
                         api_key, model_id, messages, schema

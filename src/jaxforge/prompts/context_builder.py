@@ -86,8 +86,12 @@ class ContextBuilder:
             sys_prompt = f"{sys_prompt}\nPreferred framework: use equinox (import equinox as eqx)."
 
         messages: list[dict[str, Any]] = [
-            {"role": "user", "parts": [sys_prompt]},
-            {"role": "model", "parts": ["Understood. I will generate JAX code."]},
+            {"role": "user", "parts": [sys_prompt], "system": True},
+            {
+                "role": "model",
+                "parts": ["Understood. I will generate JAX code."],
+                "system_ack": True,
+            },
         ]
 
         messages.extend(_bound_history_messages(memory.to_gemini_messages(), MAX_MEMORY_CHARS))

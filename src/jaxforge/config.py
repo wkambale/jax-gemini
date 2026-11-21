@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import os
+import urllib.parse
 from dataclasses import dataclass, field, fields
 from typing import Any
 
@@ -78,7 +79,7 @@ class JaxForgeConfig:
             "openai": ("OPENAI_API_KEY",),
             "anthropic": ("ANTHROPIC_API_KEY",),
             "openrouter": ("OPENROUTER_API_KEY",),
-            "ollama": ("OLLAMA_API_KEY", "OPENAI_API_KEY"),
+            "ollama": ("OLLAMA_API_KEY",),
             "litellm": ("LITELLM_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "ANTHROPIC_API_KEY"),
         }
         for env_var in env_candidates.get(prov, ("GEMINI_API_KEY",)):
@@ -127,6 +128,15 @@ class JaxForgeConfig:
                 or any(ch in self.base_url for ch in ("\n", "\r", "\x00"))
             ):
                 raise JaxForgeConfigError("base_url must be a valid http(s) URL or None")
+            parsed_url = urllib.parse.urlsplit(self.base_url.strip())
+            host = (parsed_url.hostname or "").lower()
+            if not host:
+                raise JaxForgeConfigError("base_url must include a valid hostname")
+            if parsed_url.scheme == "http" and host not in ("localhost", "127.0.0.1", "::1"):
+                raise JaxForgeConfigError(
+                    "Plaintext http:// base_url is only permitted for loopback hosts "
+                    "(localhost, 127.0.0.1, ::1); use https:// for remote endpoints"
+                )
         if (
             isinstance(self.temperature, bool)
             or not isinstance(self.temperature, (int, float))
