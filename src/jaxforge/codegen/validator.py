@@ -194,6 +194,29 @@ ALLOWED_DUNDER_ATTRIBUTES: frozenset[str] = frozenset(
     }
 )
 
+ALLOWED_DECORATORS: frozenset[str] = frozenset(
+    {
+        "jit",
+        "vmap",
+        "pmap",
+        "grad",
+        "value_and_grad",
+        "remat",
+        "checkpoint",
+        "custom_jvp",
+        "custom_vjp",
+        "filter_jit",
+        "filter_vmap",
+        "filter_grad",
+        "filter_value_and_grad",
+        "dataclass",
+        "staticmethod",
+        "classmethod",
+        "property",
+        "partial",
+    }
+)
+
 REQUIRED_FUNCTION_NAMES: dict[str, str] = {
     "build": "build_model",
     "train": "train_model",
@@ -213,6 +236,94 @@ MAX_AST_NODES = 2_000
 
 def _contains_call(node: ast.AST) -> bool:
     return any(isinstance(child, ast.Call) for child in ast.walk(node))
+
+
+def _decorator_leaf_name(expr: ast.expr) -> str | None:
+    if isinstance(expr, ast.Name):
+        return expr.id
+    if isinstance(expr, ast.Attribute):
+        return expr.attr
+    return None
+
+
+def _is_safe_field_spec(expr: ast.expr | None) -> bool:
+    if expr is None or not _contains_call(expr):
+        return True
+    if isinstance(expr, ast.Call) and _decorator_leaf_name(expr.func) == "field":
+        return (
+            not _contains_call(expr.func)
+            and not any(_contains_call(a) for a in expr.args)
+            and not any(_contains_call(kw.value) for kw in expr.keywords)
+        )
+    return False
+
+
+def _validate_decorator(dec: ast.expr, code: str) -> None:
+    if isinstance(dec, (ast.Name, ast.Attribute)):
+        leaf = _decorator_leaf_name(dec)
+        if leaf in ALLOWED_DECORATORS and not _contains_call(dec):
+            return
+        raise JaxForgeValidationError(
+            f"Decorator '{leaf or type(dec).__name__}' is not allowed in generated code.",
+            code=code,
+        )
+    if isinstance(dec, ast.Call):
+        leaf = _decorator_leaf_name(dec.func)
+        if (
+            leaf in ALLOWED_DECORATORS
+            and not _contains_call(dec.func)
+            and not any(_contains_call(a) for a in dec.args)
+            and not any(_contains_call(kw.value) for kw in dec.keywords)
+        ):
+            return
+    raise JaxForgeValidationError(
+        "Decorator calls with arbitrary expressions are not allowed in generated code.",
+        code=code,
+    )
+
+
+def _validate_function_def(fn_node: ast.FunctionDef, code: str) -> None:
+    for dec in fn_node.decorator_list:
+        _validate_decorator(dec, code)
+    defaults = list(fn_node.args.defaults) + [
+        d for d in fn_node.args.kw_defaults if d is not None
+    ]
+    for default_expr in defaults:
+        if _contains_call(default_expr):
+            raise JaxForgeValidationError(
+                f"Function '{fn_node.name}' default arguments cannot contain function calls.",
+                code=code,
+            )
+
+
+def _validate_class_def(cls_node: ast.ClassDef, code: str) -> None:
+    for dec in cls_node.decorator_list:
+        _validate_decorator(dec, code)
+    if any(_contains_call(b) for b in cls_node.bases) or any(
+        _contains_call(kw.value) for kw in cls_node.keywords
+    ):
+        raise JaxForgeValidationError(
+            f"Class '{cls_node.name}' base specifications cannot contain function calls.",
+            code=code,
+        )
+    for sub in cls_node.body:
+        if isinstance(sub, (ast.FunctionDef, ast.Pass)):
+            continue
+        if (
+            isinstance(sub, ast.Expr)
+            and isinstance(sub.value, ast.Constant)
+            and isinstance(sub.value.value, str)
+        ):
+            continue
+        if isinstance(sub, ast.Assign) and _is_safe_field_spec(sub.value):
+            continue
+        if isinstance(sub, ast.AnnAssign) and _is_safe_field_spec(sub.value):
+            continue
+        raise JaxForgeValidationError(
+            f"Class '{cls_node.name}' body contains disallowed definition-time statement "
+            f"'{type(sub).__name__}'.",
+            code=code,
+        )
 
 
 def _validate_top_level_statement(stmt: ast.stmt, code: str) -> None:
@@ -330,6 +441,31 @@ class CodeValidator:
                             f"Import of '{imported}' from '{node.module}' is not allowed.",
                             code=code,
                         )
+
+            if isinstance(node, ast.FunctionDef):
+                _validate_function_def(node, code)
+
+            if isinstance(node, ast.ClassDef):
+                _validate_class_def(node, code)
+
+            if isinstance(node, (ast.AsyncFunctionDef, ast.AsyncFor, ast.AsyncWith, ast.Await)):
+                raise JaxForgeValidationError(
+                    "Async constructs are not allowed in generated sandboxed code.",
+                    code=code,
+                )
+
+            try_star_cls = getattr(ast, "TryStar", None)
+            if try_star_cls is not None and isinstance(node, try_star_cls):
+                raise JaxForgeValidationError(
+                    "Exception-group 'except*' blocks are not allowed in generated code.",
+                    code=code,
+                )
+
+            if isinstance(node, ast.Try) and node.finalbody:
+                raise JaxForgeValidationError(
+                    "'finally' blocks are not allowed in sandboxed code.",
+                    code=code,
+                )
 
             if isinstance(node, ast.ExceptHandler) and node.type is None:
                 raise JaxForgeValidationError(

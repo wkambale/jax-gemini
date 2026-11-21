@@ -62,6 +62,22 @@ class TestPreviewExploreExport:
         dry = agent.build("Build a linear layer", dry_run=True)
         assert isinstance(dry, GeneratedPlan)
 
+        # Data intents routed via agent.run() must enforce approve callbacks
+        data_resp = MagicMock()
+        data_resp.text = json.dumps(
+            {
+                "intent": "load_data",
+                "code": "def load_data():\n    return [1, 2, 3]\n",
+                "description": "synthetic list",
+            }
+        )
+        mock_genai.GenerativeModel.return_value.generate_content.return_value = data_resp
+        with pytest.raises(JaxForgeApprovalError, match="rejected"):
+            agent.run("load dataset from memory", approve=lambda _p: False)
+        with pytest.raises(JaxForgeApprovalError, match="auto_approve is False"):
+            agent.run("load dataset from memory")
+        assert agent.run("load dataset from memory", approve=lambda _p: True) == [1, 2, 3]
+
     def test_dataset_profile_and_context_injection(self):
         X = np.array([[1.0, np.nan], [3.0, 4.0]])
         y = np.array([0, 1])
