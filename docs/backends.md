@@ -18,9 +18,9 @@ jf.config.set({
 | --- | --- | --- | --- |
 | `thread` | In-process worker thread, `sys.settrace` deadline, read-only module proxies | Local interactive notebooks | `timeout_seconds` |
 | `subprocess` | Fresh OS child process with `resource.setrlimit` memory cap | CI pipelines and local automation | `max_memory_mb`, `timeout_seconds` |
-| `docker` | Ephemeral Docker container (`--network=none`, `--read-only`, `--memory`) | Self-hosted multi-user APIs | `docker_image`, `max_memory_mb` |
-| `e2b` | Remote cloud microVM (`e2b_code_interpreter`) | Managed SaaS sandboxes | `E2B_API_KEY` |
-| `modal` | Ephemeral remote serverless sandbox (`modal`) | Scalable burst compute | Modal CLI auth |
+| `docker` | Ephemeral Docker container (`--network=none`, `--read-only`, `--tmpfs /tmp`, `--memory`) | Self-hosted multi-user APIs | `docker_image`, `max_memory_mb`, `timeout_seconds` |
+| `e2b` | Remote cloud microVM (`e2b_code_interpreter`) | Managed SaaS sandboxes | `E2B_API_KEY`, `timeout_seconds` |
+| `modal` | Ephemeral remote serverless sandbox (`modal` with `block_network=True`) | Scalable burst compute | Modal CLI auth, `timeout_seconds` |
 
 ## Custom backend implementations
 

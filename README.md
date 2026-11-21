@@ -14,7 +14,7 @@ Unlike blind code-execution wrappers, `jaxforge` supports an inspect-first gate 
 
 ## Core features
 
-- **Inspect-first preview and approval**: Generate and AST-validate code with `jf.preview()` or `dry_run=True` to inspect source code, unified diffs, and shape estimates before running compute.
+- **Inspect-first preview and approval**: Generate and AST-validate code with `jf.preview()` or `dry_run=True` to inspect source code, unified diffs, and validation metadata before running compute, and verify abstract tensor shapes with `eval_shape_summary()`.
 - **Multi-provider LLM routing**: Use Google Gemini, OpenAI, Anthropic Claude, OpenRouter, LiteLLM, or local Ollama and vLLM servers through `provider` or `model_name` prefixes (such as `anthropic:claude-sonnet-4-5`, `openai:gpt-5`, or `ollama:qwen2.5-coder:32b`) with fast/primary routing.
 - **Production JAX workflows**: Supports Flax NNX and Equinox modeling, Optax schedules, `jax.sharding` device meshes, Grain streaming datasets, Orbax and Safetensors checkpoints, and `jax.eval_shape` checks.
 - **Pluggable sandbox isolation**: Enforces AST allowlists, `WeakKeyDictionary` module proxies, and confined file I/O across `thread`, `subprocess` (with memory/CPU limits), `docker`, `e2b`, and `modal` backends.
@@ -24,18 +24,18 @@ Unlike blind code-execution wrappers, `jaxforge` supports an inspect-first gate 
 
 ### Installation
 
-Install `jaxforge` from [PyPI](https://pypi.org/project/jaxforge/0.2.0/):
+Install `jaxforge` from [PyPI](https://pypi.org/project/jaxforge/):
 
 ```bash
 pip install jaxforge
 ```
 
-Optional extras install provider SDKs, modeling frameworks, sandboxes, or plotting:
+OpenAI, Anthropic, OpenRouter, Ollama, and the Docker backend work out of the box using Python's standard library and the `docker` CLI. Optional extras install additional SDKs, modeling frameworks, cloud sandboxes, or plotting:
 
 ```bash
-pip install "jaxforge[google,openai,anthropic,viz]"
+pip install "jaxforge[google,litellm,viz]"
 pip install "jaxforge[equinox,grain,safetensors]"
-pip install "jaxforge[docker,e2b,modal,mcp]"
+pip install "jaxforge[e2b,modal,mcp]"
 ```
 
 Configure an API key for your chosen provider (or point `base_url` at a local Ollama or vLLM endpoint):
@@ -57,8 +57,8 @@ jf.config.set({"model_name": "anthropic:claude-sonnet-4-5"})
 plan = jf.preview("Build a 4-layer MLP for 28x28 digit classification")
 print(plan.code)
 
-# Execute after review, or use build/modify/train with interactive approval
-model = jf.build("Build a 4-layer MLP for digit classification")
+# Execute the previewed plan directly, or use build/modify/train with approval gates
+model = jf.execute_plan(plan)
 model = jf.modify("Add dropout with rate 0.2 between hidden layers")
 
 X_train = np.random.randn(100, 28, 28, 1).astype(np.float32)

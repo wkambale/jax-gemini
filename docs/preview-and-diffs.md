@@ -13,6 +13,8 @@ plan = jf.preview("Build a residual MLP with layer normalization and GELU")
 print("Intent:", plan.intent)
 print("Valid:", plan.validation_passed)
 print(plan.code)
+
+model = jf.execute_plan(plan)
 ```
 
 In Jupyter and IPython notebooks, `GeneratedPlan` implements `_repr_html_()` to render intent metadata, validation status, optional diffs, warnings, and formatted source automatically.
@@ -24,7 +26,7 @@ Set `auto_approve=False` in `JaxForgeConfig` to require an explicit `approve(pla
 ```python
 from jaxforge import JaxForge, JaxForgeConfig, JaxForgeApprovalError
 
-agent = JaxForge(JaxForgeConfig(gemini_api_key="your-key", auto_approve=False))
+agent = JaxForge(JaxForgeConfig(api_key="your-key", auto_approve=False))
 
 def review_gate(plan):
     print(plan.code)
@@ -38,7 +40,7 @@ except JaxForgeApprovalError as err:
 
 ## Unified diff refinement
 
-When iterating on an existing model with `modify(..., use_diff=True)`, Jax Forge prompts the LLM to emit focused unified diff hunks (`diff`) when appropriate and applies them cleanly against `_last_code` via `CodeParser` and `apply_unified_diff()`. Both before/after code and the computed unified diff are attached to `GeneratedPlan.diff` for auditing.
+When iterating on an existing model with `modify(..., use_diff=True)`, Jax Forge prompts the LLM to emit focused unified diff hunks (`diff`) when appropriate and applies them cleanly against the previous model state via `CodeParser` and `apply_unified_diff()`. Computed unified diffs are attached to `GeneratedPlan.unified_diff` for auditing.
 
 ## Privacy-preserving dataset profiling
 
