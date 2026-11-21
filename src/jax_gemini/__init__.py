@@ -14,6 +14,7 @@ from jaxforge import (
     build,
     config,
     evaluate,
+    execute_plan,
     explain,
     explore,
     export_project,
@@ -29,6 +30,9 @@ from jaxforge import (
     train,
     usage_summary,
     visualize_data,
+)
+from jaxforge import (
+    JaxForgeApprovalError as JaxGeminiApprovalError,
 )
 from jaxforge import (
     JaxForgeCheckpointError as JaxGeminiCheckpointError,
@@ -65,6 +69,7 @@ warnings.warn(
 __all__ = [
     "JaxForgeApprovalError",
     "JaxGemini",
+    "JaxGeminiApprovalError",
     "JaxGeminiCheckpointError",
     "JaxGeminiConfig",
     "JaxGeminiConfigError",
@@ -80,6 +85,7 @@ __all__ = [
     "build",
     "config",
     "evaluate",
+    "execute_plan",
     "explain",
     "explore",
     "export_project",

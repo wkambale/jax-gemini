@@ -13,6 +13,7 @@ from jaxforge.agent import JaxForge
 from jaxforge.codegen.validator import CodeValidator
 from jaxforge.config import SUPPORTED_BACKENDS, SUPPORTED_PROVIDERS, JaxForgeConfig
 from jaxforge.contrib.sharding import device_summary
+from jaxforge.exceptions import JaxForgeError, JaxForgeValidationError
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -43,10 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(list(argv) if argv is not None else None)
-
+def _dispatch(args: argparse.Namespace) -> int:
     if args.command == "info":
         payload = {
             "version": jaxforge.__version__,
@@ -76,7 +74,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"# Intent: {plan.intent} ({plan.provider}:{plan.model_name})\n")
         print(plan.code)
         if args.export:
-            from jaxforge.exceptions import JaxForgeValidationError
             from jaxforge.exporter import export_project
 
             if plan.intent != "build":
@@ -118,6 +115,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     return 1
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(list(argv) if argv is not None else None)
+    try:
+        return _dispatch(args)
+    except (EOFError, KeyboardInterrupt):
+        print("Aborted.", file=sys.stderr)
+        return 1
+    except (JaxForgeError, OSError, UnicodeDecodeError, ValueError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 """Optax optimizer and schedule convenience helpers for jaxforge workflows."""
 
+import math
 from collections.abc import Callable
 from typing import Any
 
@@ -32,6 +33,7 @@ def create_optimizer(
     if (
         isinstance(learning_rate, bool)
         or not isinstance(learning_rate, int | float)
+        or not math.isfinite(learning_rate)
         or not (learning_rate > 0)
     ):
         raise ValueError(f"learning_rate must be a positive number, got {learning_rate!r}.")
@@ -44,11 +46,26 @@ def create_cosine_schedule(
     total_steps: int = 1000,
 ) -> optax.Schedule:
     """Build a linear warmup + cosine decay learning-rate schedule."""
+    if (
+        isinstance(peak_lr, bool)
+        or not isinstance(peak_lr, int | float)
+        or not math.isfinite(peak_lr)
+        or not (peak_lr > 0)
+    ):
+        raise ValueError(f"peak_lr must be a finite positive number, got {peak_lr!r}.")
+    if (
+        isinstance(warmup_steps, bool)
+        or not isinstance(warmup_steps, int)
+        or isinstance(total_steps, bool)
+        or not isinstance(total_steps, int)
+    ):
+        raise ValueError("warmup_steps and total_steps must be integers.")
     if warmup_steps < 0 or total_steps <= warmup_steps:
         raise ValueError("Require 0 <= warmup_steps < total_steps.")
+    peak = float(peak_lr)
     return optax.warmup_cosine_decay_schedule(
-        init_value=0.0 if warmup_steps > 0 else peak_lr,
-        peak_value=peak_lr,
+        init_value=0.0 if warmup_steps > 0 else peak,
+        peak_value=peak,
         warmup_steps=warmup_steps,
         decay_steps=total_steps,
     )

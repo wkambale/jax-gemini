@@ -209,6 +209,24 @@ class TestBackendsCliMcpContrib:
         assert make_replicated_sharding(mesh).spec == jax.sharding.PartitionSpec()
         assert make_data_sharding(mesh, "data").spec == jax.sharding.PartitionSpec("data")
 
+        num_devs = len(jax.devices())
+        mesh_explicit = create_device_mesh(("data", "model"), mesh_shape=(num_devs, 1))
+        assert mesh_explicit.axis_names == ("data", "model")
+        with pytest.raises(ValueError, match="non-empty"):
+            create_device_mesh(())
+        with pytest.raises(ValueError, match="non-empty strings"):
+            create_device_mesh((" ",))
+        with pytest.raises(ValueError, match="unique"):
+            create_device_mesh(("data", "data"))
+        with pytest.raises(ValueError, match="length"):
+            create_device_mesh(("data",), mesh_shape=(num_devs, 1))
+        with pytest.raises(ValueError, match="positive integers"):
+            create_device_mesh(("data",), mesh_shape=(True,))
+        with pytest.raises(ValueError, match="positive integers"):
+            create_device_mesh(("data",), mesh_shape=(0,))
+        with pytest.raises(ValueError, match="prod"):
+            create_device_mesh(("data",), mesh_shape=(num_devs + 1,))
+
         shape_info = eval_shape_summary(
             lambda x: x @ jnp.ones((4, 2)),
             jax.ShapeDtypeStruct((3, 4), jnp.float32),
@@ -218,6 +236,13 @@ class TestBackendsCliMcpContrib:
         sched = create_cosine_schedule(peak_lr=1e-2, warmup_steps=5, total_steps=50)
         assert float(sched(0)) == 0.0
         assert float(sched(5)) == pytest.approx(1e-2)
+        for bad_lr in (True, False, 0.0, -1e-3, float("nan"), float("inf")):
+            with pytest.raises(ValueError, match="peak_lr"):
+                create_cosine_schedule(peak_lr=bad_lr)  # type: ignore[arg-type]
+        with pytest.raises(ValueError, match="integers"):
+            create_cosine_schedule(peak_lr=1e-3, warmup_steps=True, total_steps=10)
+        with pytest.raises(ValueError, match="0 <= warmup_steps < total_steps"):
+            create_cosine_schedule(peak_lr=1e-3, warmup_steps=10, total_steps=10)
 
         mem = create_tracker("memory")
         assert isinstance(mem, InMemoryTracker)
@@ -245,6 +270,63 @@ class TestBackendsCliMcpContrib:
         sample = tmp_path / "sample.py"
         sample.write_text("import flax.nnx as nnx\ndef build_model(rngs):\n    return 1\n")
         assert cli_main(["validate", str(sample), "--intent", "build"]) == 0
+        capsys.readouterr()
+
+        # CLI catches FileNotFoundError, JaxForgeValidationError, and EOFError without tracebacks
+        assert cli_main(["validate", str(tmp_path / "missing.py")]) == 1
+        err_missing = capsys.readouterr().err
+        assert "Error:" in err_missing and "Traceback" not in err_missing
+
+        bad_file = tmp_path / "bad.py"
+        bad_file.write_text("import os\ndef build_model(rngs):\n    return 1\n")
+        assert cli_main(["validate", str(bad_file), "--intent", "build"]) == 1
+        err_bad = capsys.readouterr().err
+        assert "Error:" in err_bad and "Traceback" not in err_bad
+
+        from unittest.mock import patch
+
+        from jaxforge.plan import GeneratedPlan
+
+        dummy_plan = GeneratedPlan(
+            intent="build",
+            code=(
+                "import flax.nnx as nnx\n"
+                "def build_model(rngs):\n"
+                "    return nnx.Linear(2, 1, rngs=rngs)\n"
+            ),
+            description="tiny",
+            provider="google",
+            model_name="gemini-3.1-pro",
+        )
+        # Missing API key in run exits cleanly with status 1 instead of traceback
+        assert cli_main(["run", "build tiny model"]) == 1
+        err_key = capsys.readouterr().err
+        assert "Error:" in err_key and "Traceback" not in err_key
+
+        import os
+        from unittest.mock import MagicMock
+
+        fake_llm = MagicMock()
+        fake_llm.generate.return_value = {
+            "intent": "build",
+            "code": dummy_plan.code,
+            "description": "tiny",
+        }
+        with (
+            patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}),
+            patch("jaxforge.agent.create_llm", return_value=fake_llm),
+        ):
+            with patch("builtins.input", side_effect=EOFError):
+                assert cli_main(["run", "build tiny model"]) == 1
+                err_eof = capsys.readouterr().err
+                assert "Aborted." in err_eof
+
+            assert cli_main(["run", "build tiny model", "--yes", "--model", "gemini-3.1-pro"]) == 0
+            capsys.readouterr()
+            export_out = tmp_path / "cli_exported"
+            assert cli_main(["preview", "build tiny model", "--export", str(export_out)]) == 0
+            capsys.readouterr()
+            assert (export_out / "pyproject.toml").is_file()
 
         assert tool_validate_jax_code("def build_model(rngs): return 1")["valid"] is True
         bad = "import os\ndef build_model(rngs): return 1"
@@ -307,10 +389,51 @@ class TestBackendsCliMcpContrib:
         assert "equinox>=0.11.0" in toml_src
 
     def test_jax_gemini_compatibility_shim(self):
+        import jaxforge as jf
+        from jaxforge.plan import GeneratedPlan
+
+        assert callable(jf.execute_plan)
+        assert "execute_plan" in jf.__all__
+        plan = GeneratedPlan(
+            intent="analyze_data",
+            code="def analyze_data(dataset=None):\n    return {'rows': 3}\n",
+            description="analyze",
+            provider="google",
+            model_name="gemini-3.1-pro",
+        )
+        assert jf.execute_plan(plan) == {"rows": 3}
+
         sys.modules.pop("jax_gemini", None)
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             import jax_gemini
+            from jax_gemini.codegen.validator import CodeValidator
+            from jax_gemini.contrib import create_optimizer
+            from jax_gemini.contrib.flax import count_parameters
+            from jax_gemini.exceptions import JaxGeminiApprovalError
+            from jax_gemini.llm.gemini import GeminiLLM
+            from jax_gemini.memory.conversation import ConversationMemory
+            from jax_gemini.pipeline import ModelBuilder, ModelTrainer
+            from jax_gemini.pipeline.builder import ModelBuilder as SubModelBuilder
+            from jax_gemini.prompts.intent import IntentClassifier
+            from jax_gemini.sandbox.executor import SandboxExecutor
 
             assert any(issubclass(w.category, DeprecationWarning) for w in caught)
             assert jax_gemini.JaxGemini.__name__ == "JaxForge"
+            assert jax_gemini.JaxGeminiApprovalError is JaxGeminiApprovalError
+            assert JaxGeminiApprovalError is jf.JaxForgeApprovalError
+            assert jax_gemini.execute_plan is jf.execute_plan
+            assert ModelBuilder is SubModelBuilder
+            assert all(
+                obj is not None
+                for obj in (
+                    CodeValidator,
+                    create_optimizer,
+                    count_parameters,
+                    GeminiLLM,
+                    ConversationMemory,
+                    ModelTrainer,
+                    IntentClassifier,
+                    SandboxExecutor,
+                )
+            )

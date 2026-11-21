@@ -58,3 +58,4 @@ JaxGeminiValidationError = JaxForgeValidationError
 JaxGeminiExecutionError = JaxForgeExecutionError
 JaxGeminiIntentError = JaxForgeIntentError
 JaxGeminiCheckpointError = JaxForgeCheckpointError
+JaxGeminiApprovalError = JaxForgeApprovalError

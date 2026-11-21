@@ -39,6 +39,7 @@ __all__ = [
     "build",
     "config",
     "evaluate",
+    "execute_plan",
     "explain",
     "explore",
     "export_project",
@@ -66,6 +67,7 @@ train = _default_agent.train
 evaluate = _default_agent.evaluate
 explore = _default_agent.explore
 preview = _default_agent.preview
+execute_plan = _default_agent.execute_plan
 export_project = _default_agent.export_project
 save = _default_agent.save
 load = _default_agent.load

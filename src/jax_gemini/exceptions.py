@@ -2,6 +2,7 @@
 
 from jaxforge.exceptions import (
     JaxForgeApprovalError,
+    JaxGeminiApprovalError,
     JaxGeminiCheckpointError,
     JaxGeminiConfigError,
     JaxGeminiError,
@@ -13,6 +14,7 @@ from jaxforge.exceptions import (
 
 __all__ = [
     "JaxForgeApprovalError",
+    "JaxGeminiApprovalError",
     "JaxGeminiCheckpointError",
     "JaxGeminiConfigError",
     "JaxGeminiError",
