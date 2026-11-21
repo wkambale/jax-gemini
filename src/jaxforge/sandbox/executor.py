@@ -59,6 +59,7 @@ class SandboxExecutor:
         timeout_seconds: float = 60.0,
         backend_name: str = "thread",
         max_memory_mb: int | None = None,
+        docker_image: str = "jaxforge-sandbox:latest",
     ) -> Any:
         """Validate ``code`` and run the intent handler function safely."""
         CodeValidator.validate(code, intent)
@@ -67,7 +68,9 @@ class SandboxExecutor:
             raise JaxForgeExecutionError(f"Unknown intent: {intent}")
         call_args = {**INTENT_DEFAULT_ARGS.get(intent, {}), **(args or {})}
         backend = self._backend or (
-            ThreadSandboxBackend() if backend_name == "thread" else create_backend(backend_name)
+            ThreadSandboxBackend()
+            if backend_name == "thread"
+            else create_backend(backend_name, docker_image=docker_image)
         )
         return backend.execute(
             code=code,

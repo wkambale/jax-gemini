@@ -218,6 +218,7 @@ class JaxForge:
             timeout_seconds=self.config.timeout_seconds,
             backend_name=self.config.execution_backend,
             max_memory_mb=self.config.max_memory_mb,
+            docker_image=self.config.docker_image,
         )
         raw_resp = plan.metadata.get("raw_response") or {
             "intent": plan.intent,
@@ -344,6 +345,7 @@ class JaxForge:
                     timeout_seconds=self.config.timeout_seconds,
                     backend_name=self.config.execution_backend,
                     max_memory_mb=self.config.max_memory_mb,
+                    docker_image=self.config.docker_image,
                 )
 
                 self._record_success(intent, user_prompt, code, response)
