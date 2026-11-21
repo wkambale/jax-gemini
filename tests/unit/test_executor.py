@@ -219,3 +219,93 @@ class TestSandboxExecutor:
         with pytest.raises(ImportError, match="Relative"):
             _safe_import("numpy", level=1)
         assert callable(ns["np"].zeros)
+
+    def test_transitive_stdlib_and_ml_io_confinement(self, tmp_path):
+        from types import ModuleType
+
+        import jaxforge.sandbox.namespace as ns_mod
+        from jaxforge.codegen.validator import CodeValidator
+        from jaxforge.exceptions import JaxForgeValidationError
+
+        assert not hasattr(ns_mod, "BASE_NAMESPACE")
+
+        ns = ns_mod.get_execution_namespace(intent="build", allowed_dirs=(tmp_path,))
+        importer = ns["__builtins__"]["__import__"]
+        for mod_name in ("dataclasses", "typing", "functools"):
+            mod = importer(mod_name)
+            for forbidden_attr in ("sys", "os", "io", "builtins", "subprocess"):
+                with pytest.raises(AttributeError, match="blocked"):
+                    getattr(mod, forbidden_attr)
+
+        # Unwhitelisted ModuleType attribute attached to a module must be blocked
+        fake_host_mod = ModuleType("http.client")
+        raw_target = ModuleType("math")
+        raw_target.custom_leak = fake_host_mod  # type: ignore[attr-defined]
+        proxy = ns_mod._SafeModuleProxy(raw_target, allowed_imports=frozenset({"math"}))
+        with pytest.raises(AttributeError, match="blocked"):
+            _ = proxy.custom_leak
+
+        # jax.profiler blocked in both validator and runtime proxy
+        bad_prof = "import jax.profiler\ndef build_model(rngs): return 1\n"
+        with pytest.raises(JaxForgeValidationError):
+            CodeValidator.validate(bad_prof, "build")
+        with pytest.raises(AttributeError, match="blocked"):
+            _ = ns["jax"].profiler
+
+        # Equinox serialization blocked in build, confined in save/load
+        fake_eqx = ModuleType("equinox")
+        saved_paths: list[str] = []
+        fake_eqx.tree_serialise_leaves = lambda p, t: saved_paths.append(str(p))  # type: ignore[attr-defined]
+        fake_eqx.tree_deserialise_leaves = lambda p, t: str(p)  # type: ignore[attr-defined]
+
+        eqx_build = ns_mod._create_safe_equinox(
+            fake_eqx, (tmp_path,), "build", frozenset({"equinox"}), {}
+        )
+        with pytest.raises(AttributeError, match="blocked"):
+            _ = eqx_build.tree_serialise_leaves
+
+        eqx_save = ns_mod._create_safe_equinox(
+            fake_eqx, (tmp_path,), "save", frozenset({"equinox"}), {}
+        )
+        eqx_save.tree_serialise_leaves("ok.eqx", {})
+        assert saved_paths and saved_paths[0].endswith("ok.eqx")
+        with pytest.raises(PermissionError, match="escapes"):
+            eqx_save.tree_serialise_leaves("/etc/passwd", {})
+
+        # Safetensors confines safe_open and blocks save_file during load
+        fake_st = ModuleType("safetensors")
+        fake_st.safe_open = lambda filename, *a, **kw: filename  # type: ignore[attr-defined]
+        fake_st_np = ModuleType("safetensors.numpy")
+        fake_st_np.load_file = lambda filename: filename  # type: ignore[attr-defined]
+        fake_st_np.save_file = lambda tensors, filename: filename  # type: ignore[attr-defined]
+        fake_st_flax = ModuleType("safetensors.flax")
+        fake_st_flax.load_file = lambda filename: filename  # type: ignore[attr-defined]
+        fake_st_flax.save_file = lambda tensors, filename: filename  # type: ignore[attr-defined]
+
+        safe_st = ns_mod._create_safe_safetensors(
+            fake_st,
+            fake_st_np,
+            fake_st_flax,
+            (tmp_path,),
+            "load",
+            frozenset({"safetensors"}),
+            {},
+        )
+        assert safe_st.safe_open("weights.safetensors").endswith("weights.safetensors")
+        with pytest.raises(PermissionError, match="escapes"):
+            safe_st.safe_open("/etc/passwd")
+        with pytest.raises(AttributeError, match="blocked"):
+            _ = safe_st.numpy.save_file
+
+        # Grain confines file data sources and blocks multiprocessing
+        fake_grain = ModuleType("grain")
+        fake_grain.ParquetDataSource = lambda paths: paths  # type: ignore[attr-defined]
+        fake_grain.multiprocessing = ModuleType("grain.multiprocessing")  # type: ignore[attr-defined]
+        safe_grain = ns_mod._create_safe_grain(
+            fake_grain, (tmp_path,), frozenset({"grain"}), {}
+        )
+        assert safe_grain.ParquetDataSource(["a.parquet"])[0].endswith("a.parquet")
+        with pytest.raises(PermissionError, match="escapes"):
+            safe_grain.ParquetDataSource(["/etc/passwd"])
+        with pytest.raises(AttributeError, match="blocked"):
+            _ = safe_grain.multiprocessing

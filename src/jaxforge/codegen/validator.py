@@ -70,12 +70,19 @@ BANNED_MODULE_PREFIXES: frozenset[str] = frozenset(
         "numpy.testing",
         "numpy.lib",
         "numpy.compat",
+        "jax.profiler",
+        "jax.experimental.compilation_cache",
         "flax.io",
         "flax.training.checkpoints",
         "orbax.checkpoint.test_utils",
         "matplotlib._api",
         "matplotlib.backend_bases",
         "matplotlib.backends",
+        "safetensors._safetensors_rust",
+        "safetensors.torch",
+        "safetensors.tensorflow",
+        "safetensors.paddle",
+        "grain.multiprocessing",
     }
 )
 
