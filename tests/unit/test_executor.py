@@ -219,3 +219,138 @@ class TestSandboxExecutor:
         with pytest.raises(ImportError, match="Relative"):
             _safe_import("numpy", level=1)
         assert callable(ns["np"].zeros)
+
+    def test_transitive_stdlib_and_ml_io_confinement(self, tmp_path):
+        from types import ModuleType
+
+        import jaxforge.sandbox.namespace as ns_mod
+        from jaxforge.codegen.validator import CodeValidator
+        from jaxforge.exceptions import JaxForgeValidationError
+
+        assert not hasattr(ns_mod, "BASE_NAMESPACE")
+
+        ns = ns_mod.get_execution_namespace(intent="build", allowed_dirs=(tmp_path,))
+        importer = ns["__builtins__"]["__import__"]
+        for mod_name in ("dataclasses", "typing", "functools"):
+            mod = importer(mod_name)
+            for forbidden_attr in ("sys", "os", "io", "builtins", "subprocess"):
+                with pytest.raises(AttributeError, match="blocked"):
+                    getattr(mod, forbidden_attr)
+
+        # Unwhitelisted ModuleType attribute attached to a module must be blocked
+        fake_host_mod = ModuleType("http.client")
+        raw_target = ModuleType("math")
+        raw_target.custom_leak = fake_host_mod  # type: ignore[attr-defined]
+        proxy = ns_mod._SafeModuleProxy(raw_target, allowed_imports=frozenset({"math"}))
+        with pytest.raises(AttributeError, match="blocked"):
+            _ = proxy.custom_leak
+
+        # jax.profiler blocked in both validator and runtime proxy
+        bad_prof = "import jax.profiler\ndef build_model(rngs): return 1\n"
+        with pytest.raises(JaxForgeValidationError):
+            CodeValidator.validate(bad_prof, "build")
+        with pytest.raises(AttributeError, match="blocked"):
+            _ = ns["jax"].profiler
+
+        # Equinox serialization blocked in build, confined in save/load
+        fake_eqx = ModuleType("equinox")
+        saved_paths: list[str] = []
+        fake_eqx.tree_serialise_leaves = lambda path_or_file, tree=None: saved_paths.append(
+            str(path_or_file)
+        )  # type: ignore[attr-defined]
+        fake_eqx.tree_deserialise_leaves = lambda path_or_file, like=None: str(path_or_file)  # type: ignore[attr-defined]
+
+        eqx_build = ns_mod._create_safe_equinox(
+            fake_eqx, (tmp_path,), "build", frozenset({"equinox"}), {}
+        )
+        with pytest.raises(AttributeError, match="blocked"):
+            _ = eqx_build.tree_serialise_leaves
+
+        eqx_save = ns_mod._create_safe_equinox(
+            fake_eqx, (tmp_path,), "save", frozenset({"equinox"}), {}
+        )
+        eqx_save.tree_serialise_leaves("ok.eqx", {})
+        assert saved_paths and saved_paths[0].endswith("ok.eqx")
+        with pytest.raises(PermissionError, match="escapes"):
+            eqx_save.tree_serialise_leaves("/etc/passwd", {})
+
+        eqx_load = ns_mod._create_safe_equinox(
+            fake_eqx, (tmp_path,), "load", frozenset({"equinox"}), {}
+        )
+        assert eqx_load.tree_deserialise_leaves(path_or_file="ok.eqx", like={}).endswith("ok.eqx")
+        with pytest.raises(AttributeError, match="blocked"):
+            _ = eqx_load.tree_serialise_leaves
+
+        # Safetensors confines safe_open and blocks save_file during load
+        fake_st = ModuleType("safetensors")
+        fake_st.safe_open = lambda filename, *a, **kw: filename  # type: ignore[attr-defined]
+        fake_st_np = ModuleType("safetensors.numpy")
+        fake_st_np.load_file = lambda filename: filename  # type: ignore[attr-defined]
+        fake_st_np.save_file = lambda filename: filename  # type: ignore[attr-defined]
+        fake_st_flax = ModuleType("safetensors.flax")
+        fake_st_flax.load_file = lambda filename: filename  # type: ignore[attr-defined]
+        fake_st_flax.save_file = lambda filename: filename  # type: ignore[attr-defined]
+
+        safe_st = ns_mod._create_safe_safetensors(
+            fake_st,
+            fake_st_np,
+            fake_st_flax,
+            (tmp_path,),
+            "load",
+            frozenset({"safetensors"}),
+            {},
+        )
+        assert safe_st.safe_open("weights.safetensors").endswith("weights.safetensors")
+        with pytest.raises(PermissionError, match="escapes"):
+            safe_st.safe_open("/etc/passwd")
+        with pytest.raises(AttributeError, match="blocked"):
+            _ = safe_st.numpy.save_file
+
+        safe_st_save = ns_mod._create_safe_safetensors(
+            fake_st,
+            fake_st_np,
+            fake_st_flax,
+            (tmp_path,),
+            "save",
+            frozenset({"safetensors"}),
+            {},
+        )
+        assert safe_st_save.flax.save_file(filename="w.safetensors").endswith("w.safetensors")
+
+        # Grain confines file data sources (including grain.python and keyword args)
+        fake_grain = ModuleType("grain")
+        fake_grain_py = ModuleType("grain.python")
+        fake_grain_py.ArrayRecordDataSource = lambda paths: paths  # type: ignore[attr-defined]
+        fake_grain.python = fake_grain_py  # type: ignore[attr-defined]
+        fake_grain.ParquetDataSource = lambda paths: paths  # type: ignore[attr-defined]
+        fake_grain.multiprocessing = ModuleType("grain.multiprocessing")  # type: ignore[attr-defined]
+        safe_grain = ns_mod._create_safe_grain(
+            fake_grain, (tmp_path,), frozenset({"grain"}), {}
+        )
+        assert safe_grain.ParquetDataSource(["a.parquet"])[0].endswith("a.parquet")
+        assert safe_grain.python.ArrayRecordDataSource(paths="b.arecord").endswith("b.arecord")
+        with pytest.raises(PermissionError, match="sequence of paths"):
+            safe_grain.ParquetDataSource(123)
+        with pytest.raises(PermissionError, match="confined path"):
+            safe_grain.ParquetDataSource(other=1)
+        with pytest.raises(PermissionError, match="escapes"):
+            safe_grain.ParquetDataSource(["/etc/passwd"])
+        with pytest.raises(AttributeError, match="blocked"):
+            _ = safe_grain.multiprocessing
+
+        # Exercise get_execution_namespace optional library branches
+        from unittest.mock import patch
+
+        with patch.multiple(
+            ns_mod,
+            _equinox_available=True,
+            eqx=fake_eqx,
+            _grain_available=True,
+            grain=fake_grain,
+            _safetensors_available=True,
+            safetensors=fake_st,
+            st_np=fake_st_np,
+            st_flax=fake_st_flax,
+        ):
+            ns_load = ns_mod.get_execution_namespace(intent="load", allowed_dirs=(tmp_path,))
+            assert "eqx" in ns_load and "grain" in ns_load and "safetensors" in ns_load
