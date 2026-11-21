@@ -70,6 +70,20 @@ class TestBackendsCliMcpContrib:
         with pytest.raises(JaxForgeExecutionError, match="Blocked unpickling"):
             _safe_pickle_loads(malicious_bytes)
 
+        # NNX leaves envelope rehydrates cleanly on closure-heavy Flax versions (e.g. Python 3.10)
+        nnx_mod = __import__("flax.nnx").nnx
+        leaves = [np.asarray(x) for x in jax.tree_util.tree_leaves(nnx_mod.state(res))]
+        env_bytes = pickle.dumps(("__jaxforge_nnx_leaves__", leaves))
+        rehydrated = _safe_pickle_loads(
+            env_bytes,
+            code=(
+                "import flax.nnx as nnx\n"
+                "def build_model(rngs): return nnx.Linear(4, 2, rngs=rngs)\n"
+            ),
+            intent="build",
+        )
+        assert isinstance(rehydrated, nnx_mod.Module)
+
         # Self-contained remote runner handles None, bool, and NumPy arrays and returns real types
         train_code = (
             "def train_model(dataset=None, epochs=5, learning_rate=0.001):\n"

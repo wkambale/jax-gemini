@@ -86,10 +86,36 @@ class _RestrictedUnpickler(pickle.Unpickler):
         )
 
 
+def _reconstruct_nnx_envelope(obj: Any, mod_dict: dict[str, Any]) -> Any:
+    """Rehydrate ('__jaxforge_nnx_leaves__', leaves) envelopes produced on closure-heavy Flax."""
+    if (
+        isinstance(obj, tuple)
+        and len(obj) == 2
+        and obj[0] == "__jaxforge_nnx_leaves__"
+        and isinstance(obj[1], list)
+    ):
+        import flax.nnx as nnx
+        import jax
+        import jax.numpy as jnp
+
+        build_fn = mod_dict.get("build_model")
+        if not callable(build_fn):
+            raise RuntimeError("Cannot reconstruct nnx.Module without build_model in code.")
+        host_m = build_fn(nnx.Rngs(0))
+        graphdef, state = nnx.split(host_m)
+        treedef = jax.tree_util.tree_structure(state)
+        restored = jax.tree_util.tree_unflatten(treedef, [jnp.asarray(x) for x in obj[1]])
+        return nnx.merge(graphdef, restored)
+    if isinstance(obj, tuple):
+        return tuple(_reconstruct_nnx_envelope(item, mod_dict) for item in obj)
+    return obj
+
+
 def _safe_pickle_loads(data: bytes, code: str = "", intent: str = "build") -> Any:
     """Deserialize sandbox output safely, registering custom sandbox classes when needed."""
-    needs_sandbox_mod = b"jaxforge_sandbox" in data
+    needs_sandbox_mod = (b"jaxforge_sandbox" in data) or (b"__jaxforge_nnx_leaves__" in data)
     prev_mod = sys.modules.get("jaxforge_sandbox")
+    mod_dict: dict[str, Any] = {}
     try:
         if needs_sandbox_mod and code:
             ns = get_execution_namespace(intent=intent)
@@ -97,7 +123,9 @@ def _safe_pickle_loads(data: bytes, code: str = "", intent: str = "build") -> An
             mod.__dict__.update(ns)
             sys.modules["jaxforge_sandbox"] = mod
             exec(code, mod.__dict__)
-        return _RestrictedUnpickler(io.BytesIO(data)).load()
+            mod_dict = mod.__dict__
+        raw_obj = _RestrictedUnpickler(io.BytesIO(data)).load()
+        return _reconstruct_nnx_envelope(raw_obj, mod_dict) if mod_dict else raw_obj
     except Exception as e:
         raise JaxForgeExecutionError(
             f"Failed to deserialize sandbox result safely: {e}",
@@ -184,7 +212,21 @@ def _build_self_contained_runner(payload_b64: str, out_file: str | None = None) 
         "sys.modules['jaxforge_sandbox'] = _mod\n"
         "exec(_payload['code'], _mod.__dict__)\n"
         "_res = _mod.__dict__[_payload['fn_name']](**_payload['call_args'])\n"
-        "_out_bytes = pickle.dumps(_res)\n"
+        "def _pack(v):\n"
+        "    try:\n"
+        "        pickle.dumps(v)\n"
+        "        return v\n"
+        "    except Exception:\n"
+        "        if 'nnx' in _mod.__dict__ and isinstance(v, _mod.__dict__['nnx'].Module):\n"
+        "            _jax = _mod.__dict__['jax']\n"
+        "            _np = _mod.__dict__['np']\n"
+        "            _nnx = _mod.__dict__['nnx']\n"
+        "            _lvs = [_np.asarray(x) for x in _jax.tree_util.tree_leaves(_nnx.state(v))]\n"
+        "            return ('__jaxforge_nnx_leaves__', _lvs)\n"
+        "        if isinstance(v, tuple):\n"
+        "            return tuple(_pack(i) for i in v)\n"
+        "        raise\n"
+        "_out_bytes = pickle.dumps(_pack(_res))\n"
         + sink_stmt
     )
 
@@ -343,7 +385,20 @@ class SubprocessSandboxBackend(ExecutionBackend):
             "sys.modules['jaxforge_sandbox'] = mod\n"
             "exec(payload['code'], mod.__dict__)\n"
             "res = mod.__dict__[payload['fn_name']](**payload['call_args'])\n"
-            "Path(sys.argv[2]).write_bytes(pickle.dumps(res))\n"
+            "def _pack(v):\n"
+            "    try:\n"
+            "        pickle.dumps(v)\n"
+            "        return v\n"
+            "    except Exception:\n"
+            "        import flax.nnx as _nnx, jax as _jax, numpy as _np\n"
+            "        if isinstance(v, _nnx.Module):\n"
+            "            _st = _nnx.state(v)\n"
+            "            leaves = [_np.asarray(x) for x in _jax.tree_util.tree_leaves(_st)]\n"
+            "            return ('__jaxforge_nnx_leaves__', leaves)\n"
+            "        if isinstance(v, tuple):\n"
+            "            return tuple(_pack(i) for i in v)\n"
+            "        raise\n"
+            "Path(sys.argv[2]).write_bytes(pickle.dumps(_pack(res)))\n"
         )
         with tempfile.TemporaryDirectory(prefix="jaxforge_subproc_") as tmp:
             in_path = Path(tmp) / "in.pkl"
